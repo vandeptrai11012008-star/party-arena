@@ -2,6 +2,12 @@
 const http=require('http'),fs=require('fs'),path=require('path'),crypto=require('crypto');
 const PORT=Number(process.env.PORT)||3000;
 const W=1800,H=1080,ROUND_MS=150000;
+const GAMES={
+ rumble:{id:'rumble',name:'Neon Rumble',duration:150000,objective:'Outplay rivals in a neon battle arena.'},
+ crystals:{id:'crystals',name:'Crystal Rush',duration:105000,objective:'Collect glowing crystals. No combat: speed and routes win.'},
+ zones:{id:'zones',name:'Zone Control',duration:120000,objective:'Control capture points to score. Contest the zones to stop rivals.'},
+ meteors:{id:'meteors',name:'Meteor Dodge',duration:105000,objective:'Dodge meteor showers and earn survival points. Blast meteors for bonuses.'}
+};
 const rooms=new Map(),sessions=new Map();
 const now=()=>Date.now(),rand=(a,b)=>a+Math.random()*(b-a),clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const uuid=()=>crypto.randomBytes(16).toString('hex');
@@ -27,9 +33,12 @@ function playerView(p){return {id:p.id,name:p.name,slot:p.slot,x:Math.round(p.x)
 function stateFor(r,token){
  const p=[...r.players,...r.spectators].find(x=>x.token===token);
  return {code:r.code,phase:r.phase,me:p?.id,host:r.host,isHost:p?.id===r.host,isSpectator:!!p&&!r.players.includes(p),
- serverNow:now(),endsAt:r.endsAt,round:r.round,players:r.players.map(playerView),spectators:r.spectators.map(x=>({id:x.id,name:x.name})),
+ serverNow:now(),endsAt:r.endsAt,round:r.round,gameId:r.gameId,games:Object.values(GAMES),players:r.players.map(playerView),spectators:r.spectators.map(x=>({id:x.id,name:x.name})),
  bullets:r.phase==='playing'?r.bullets.map(b=>({x:Math.round(b.x),y:Math.round(b.y),vx:b.vx,vy:b.vy,owner:b.owner})):[],
  pickups:r.phase==='playing'?r.pickups.filter(x=>x.active).map(x=>({x:x.x,y:x.y,type:x.type})):[],
+ gems:r.gameId==='crystals'&&r.phase==='playing'?r.gems.filter(g=>g.active).map(g=>({x:Math.round(g.x),y:Math.round(g.y),rare:g.rare})):[],
+ zones:r.gameId==='zones'?r.zones.map(z=>({x:z.x,y:z.y,r:z.r,owner:z.owner,contested:z.contested})):[],
+ meteors:r.gameId==='meteors'&&r.phase==='playing'?r.meteors.map(m=>({x:Math.round(m.x),y:Math.round(m.y),r:m.r})):[],
  fx:r.phase==='playing'?r.fx.map(f=>({x:f.x,y:f.y,type:f.type,id:f.id})):[],
  champion:r.champion,arena:{w:W,h:H,obstacles:OBS}
  };
@@ -40,21 +49,29 @@ function push(r){
   catch{r.clients.delete(token)}
  }
 }
-function createRoom(name){let code;do{code=newCode()}while(rooms.has(code));const p=makePlayer(name,0),r={code,players:[p],spectators:[],host:p.id,clients:new Map(),phase:'lobby',round:0,endsAt:0,bullets:[],pickups:[],fx:[],champion:'',lastTick:now(),lastPush:0,activeAt:now()};rooms.set(code,r);sessions.set(p.token,code);return {r,p}}
+function createRoom(name){let code;do{code=newCode()}while(rooms.has(code));const p=makePlayer(name,0),r={code,players:[p],spectators:[],host:p.id,clients:new Map(),phase:'lobby',round:0,gameId:'rumble',endsAt:0,bullets:[],pickups:[],gems:[],zones:[],meteors:[],meteorTimer:0,scoreTimer:0,fx:[],champion:'',lastTick:now(),lastPush:0,activeAt:now()};rooms.set(code,r);sessions.set(p.token,code);return {r,p}}
 function nextSlot(r){const slots=new Set([...r.players,...r.spectators].map(p=>p.slot));for(let i=0;i<8;i++)if(!slots.has(i))return i;return 0}
-function toLobby(r){r.phase='lobby';r.round=0;r.endsAt=0;r.champion='';r.bullets=[];r.pickups=[];r.fx=[];r.players.push(...r.spectators.splice(0,8-r.players.length));for(const p of r.players)resetPlayer(p);push(r)}
+function toLobby(r){r.phase='lobby';r.round=0;r.endsAt=0;r.champion='';r.bullets=[];r.pickups=[];r.gems=[];r.zones=[];r.meteors=[];r.meteorTimer=0;r.scoreTimer=0;r.fx=[];r.players.push(...r.spectators.splice(0,8-r.players.length));for(const p of r.players)resetPlayer(p);push(r)}
 function start(r){if(r.players.length<2)fault('At least 2 players are required to start.');
  if(r.phase!=='lobby'&&r.phase!=='done')fault('The match is already running.');
  r.players.push(...r.spectators.splice(0,8-r.players.length));
  for(const p of r.players)resetPlayer(p);
- r.round++;r.phase='countdown';r.endsAt=now()+4000;r.bullets=[];r.fx=[];r.champion='';
- r.pickups=PICKSPOTS.map((a,i)=>({x:a[0],y:a[1],type:['heal','shield','speed'][i%3],active:true,respawn:0}));
+ r.round++;r.phase='countdown';r.endsAt=now()+4000;r.bullets=[];r.fx=[];r.champion='';r.gems=[];r.zones=[];r.meteors=[];r.meteorTimer=0;r.scoreTimer=0;
+ r.pickups=r.gameId==='crystals'?[]:PICKSPOTS.map((a,i)=>({x:a[0],y:a[1],type:['heal','shield','speed'][i%3],active:true,respawn:0}));
+ if(r.gameId==='crystals')for(let i=0;i<34;i++)r.gems.push(newGem(i));
+ if(r.gameId==='zones')r.zones=[{x:425,y:555,r:135,owner:null,contested:false},{x:905,y:295,r:135,owner:null,contested:false},{x:1375,y:555,r:135,owner:null,contested:false}];
+ r.startedAt=0;
  push(r);
+}
+function newGem(i){
+ let x,y;for(let n=0;n<50;n++){x=rand(65,W-65);y=rand(65,H-65);if(canMove(x,y,24))break}
+ if(!canMove(x,y,24)){x=SPAWNS[i%8][0];y=SPAWNS[i%8][1]}
+ return {x,y,rare:i%7===0,active:true,respawn:0}
 }
 function canMove(x,y,r=22){return x>=r&&x<=W-r&&y>=r&&y<=H-r&&!OBS.some(o=>x+r>o.x&&x-r<o.x+o.w&&y+r>o.y&&y-r<o.y+o.h)}
 function move(p,dx,dy){let nx=clamp(p.x+dx,23,W-23),ny=clamp(p.y+dy,23,H-23);if(canMove(nx,p.y))p.x=nx;if(canMove(p.x,ny))p.y=ny}
 function fire(r,p,t){
- if(t<p.fireAt||p.respawnAt)return;
+ if(t<p.fireAt||p.respawnAt||r.gameId==='crystals')return;
  p.fireAt=t+240;
  const a=p.angle,speed=710;const x=p.x+Math.cos(a)*31,y=p.y+Math.sin(a)*31;
  r.bullets.push({x,y,prevX:x,prevY:y,vx:Math.cos(a)*speed,vy:Math.sin(a)*speed,owner:p.id,expires:t+1150});
@@ -66,12 +83,68 @@ function hit(r,p,shooter,t){
  if(p.respawnAt||p.invUntil>t)return;
  if(p.shield>0){p.shield--;effect(r,p.x,p.y,'shield');return}
  p.hp=Math.max(0,p.hp-25);effect(r,p.x,p.y,'hit');
- if(p.hp===0){p.deaths++;p.respawnAt=t+2600;p.input.fire=false;shooter.score+=100;shooter.kills++;effect(r,p.x,p.y,'ko')}
- else shooter.score+=10;
+ if(p.hp===0){p.deaths++;p.respawnAt=t+2600;p.input.fire=false;shooter.score+=r.gameId==='zones'?25:100;shooter.kills++;effect(r,p.x,p.y,'ko')}
+ else shooter.score+=r.gameId==='zones'?3:10;
 }
 function endGame(r){r.phase='done';r.endsAt=0;const sorted=[...r.players].sort((a,b)=>b.score-a.score||a.deaths-b.deaths);const highest=sorted[0]?.score??0;r.champion=sorted.filter(p=>p.score===highest).map(p=>p.name).join(' & ');r.bullets=[];push(r)}
+function meteorDamage(r,p,t){
+ if(p.respawnAt||p.invUntil>t)return;
+ if(p.shield>0){p.shield--;effect(r,p.x,p.y,'shield');p.invUntil=t+300;return}
+ p.hp=Math.max(0,p.hp-34);p.invUntil=t+400;effect(r,p.x,p.y,'hit');
+ if(p.hp<=0){p.deaths++;p.respawnAt=t+2300;p.input.fire=false;effect(r,p.x,p.y,'ko')}
+}
+function modeStep(r,t,dt){
+ if(r.gameId==='crystals'){
+  for(const g of r.gems){
+   if(!g.active){if(t>=g.respawn){const n=newGem(Math.floor(rand(0,40)));g.x=n.x;g.y=n.y;g.active=true}continue}
+   for(const p of r.players){
+    if(p.respawnAt)continue;
+    if(Math.hypot(p.x-g.x,p.y-g.y)<=45){
+     p.score+=g.rare?65:20;g.active=false;g.respawn=t+rand(700,1700);
+     effect(r,g.x,g.y,'gem');break
+    }
+   }
+  }
+ }
+ if(r.gameId==='zones'){
+  r.scoreTimer+=dt;
+  if(r.scoreTimer>=.5){
+   r.scoreTimer%=.5;
+   for(const z of r.zones){
+    const inside=r.players.filter(p=>!p.respawnAt&&Math.hypot(p.x-z.x,p.y-z.y)<=z.r);
+    z.contested=inside.length>1;
+    if(inside.length===1){z.owner=inside[0].id;inside[0].score+=6}
+    else if(inside.length===0)z.owner=null;
+   }
+  }
+ }
+ if(r.gameId==='meteors'){
+  const elapsed=(t-r.startedAt)/1000;
+  r.meteorTimer-=dt;
+  if(r.meteorTimer<=0&&r.meteors.length<45){
+   r.meteorTimer=Math.max(.19,.72-elapsed*.0026);
+   const alive=r.players.filter(p=>!p.respawnAt),target=alive[Math.floor(rand(0,alive.length))];
+   if(target){
+    const x=clamp(target.x+rand(-480,480),38,W-38),y=clamp(target.y-rand(340,530),-45,H-140);
+    r.meteors.push({x,y,vx:rand(-75,75),vy:rand(330,470)+Math.min(230,elapsed*1.8),r:rand(18,34),dead:false});
+   }
+  }
+  for(const m of r.meteors){
+   m.x+=m.vx*dt;m.y+=m.vy*dt;
+   if(m.y>H+90||m.x<-80||m.x>W+80){m.dead=true;continue}
+   for(const p of r.players){
+    if(!p.respawnAt&&Math.hypot(p.x-m.x,p.y-m.y)<m.r+23){
+     m.dead=true;meteorDamage(r,p,t);effect(r,m.x,m.y,'meteor');break
+    }
+   }
+  }
+  r.meteors=r.meteors.filter(m=>!m.dead);
+  r.scoreTimer+=dt;
+  if(r.scoreTimer>=1){const secs=Math.floor(r.scoreTimer);r.scoreTimer-=secs;for(const p of r.players)if(!p.respawnAt)p.score+=secs*5}
+ }
+}
 function updateRoom(r,t,dt){
- if(r.phase==='countdown'){if(t>=r.endsAt){r.phase='playing';r.endsAt=t+ROUND_MS;push(r)}return}
+ if(r.phase==='countdown'){if(t>=r.endsAt){r.phase='playing';r.startedAt=t;r.endsAt=t+(GAMES[r.gameId]?.duration||ROUND_MS);push(r)}return}
  if(r.phase!=='playing')return;
  if(t>=r.endsAt){endGame(r);return}
  for(const p of r.players){
@@ -84,12 +157,17 @@ function updateRoom(r,t,dt){
   if(input.dash&&!p.dashHeld&&p.dashAt<t&&mag>0.2){p.dashAt=t+4500;speed*=4.5;p.invUntil=Math.max(p.invUntil,t+260);effect(r,p.x,p.y,'dash')}
   p.dashHeld=input.dash;
   move(p,dx*speed*dt,dy*speed*dt);
-  if(input.fire)fire(r,p,t);
+  if(input.fire&&r.gameId!=='crystals')fire(r,p,t);
  }
  for(const b of r.bullets){
   b.prevX=b.x;b.prevY=b.y;b.x+=b.vx*dt;b.y+=b.vy*dt;
   if(t>b.expires||!canMove(b.x,b.y,5)){b.dead=true;continue}
   const owner=r.players.find(p=>p.id===b.owner);if(!owner){b.dead=true;continue}
+  if(r.gameId==='meteors'){
+   for(const m of r.meteors){if(!m.dead&&Math.hypot(m.x-b.x,m.y-b.y)<m.r+7){b.dead=true;m.dead=true;owner.score+=30;effect(r,m.x,m.y,'meteor');break}}
+   continue;
+  }
+  if(r.gameId==='crystals')continue;
   for(const p of r.players){
    if(p.id===b.owner||p.respawnAt)continue;
    if(Math.hypot(p.x-b.x,p.y-b.y)<26){b.dead=true;hit(r,p,owner,t);break}
@@ -106,6 +184,7 @@ function updateRoom(r,t,dt){
    pick.active=false;pick.respawn=t+12000;effect(r,pick.x,pick.y,'pickup');break;
   }
  }
+ modeStep(r,t,dt);
  r.fx=r.fx.filter(f=>f.until>t);
 }
 let last=now();
@@ -125,6 +204,12 @@ function api(req,res,body){
   if(route==='/api/join'){const r=getRoom(b.code),name=cleanName(b.name);if(!name)fault('Enter your nickname first');if(r.players.length+r.spectators.length>=8)fault('Room full (8 players maximum)');const p=makePlayer(name,nextSlot(r));if(r.phase==='lobby')r.players.push(p);else r.spectators.push(p);sessions.set(p.token,r.code);r.activeAt=now();push(r);return json(res,200,{token:p.token,code:r.code})}
   const {r,p}=getAuth(b.token);r.activeAt=now();
   if(route==='/api/resume')return json(res,200,{ok:true});
+  if(route==='/api/select'){
+   if(r.host!==p.id)fault('Only the host can select a game');
+   if(r.phase!=='lobby'&&r.phase!=='done')fault('Finish the match or return to lobby first');
+   if(!Object.prototype.hasOwnProperty.call(GAMES,b.gameId))fault('Unknown game mode');
+   r.gameId=b.gameId;push(r);return json(res,200,{ok:true,gameId:r.gameId});
+  }
   if(route==='/api/start'){if(r.host!==p.id)fault('Only the host can start the match');start(r);return json(res,200,{ok:true})}
   if(route==='/api/lobby'){if(r.host!==p.id)fault('Only the host can return to lobby');toLobby(r);return json(res,200,{ok:true})}
   if(route==='/api/input'){
