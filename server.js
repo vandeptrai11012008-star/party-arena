@@ -29,8 +29,38 @@ function score(r,p){const rd=r.round,remaining=Math.max(0,Math.min(1,(r.endAt-p.
  const hits=rd.correct.reduce((n,x,i)=>n+(x===p.partial[i]?1:0),0);return hits*20+(hits===5?speed:0)
 }
 function finishRound(r){if(r.phase!=='play')return;const nonce=r.roundNonce;r.phase='results';r.results=r.players.map(p=>{const points=score(r,p);p.score+=points;return {id:p.id,name:p.name,points,total:p.score}}).sort((a,b)=>b.total-a.total);r.endAt=now()+8000;push(r);setTimeout(()=>{if(r.roundNonce!==nonce||r.phase!=='results')return;if(r.roundIndex===5){endMatch(r)}else{r.roundIndex++;beginRound(r)}},8000)}
-function endMatch(r){const ranked=[...r.players].sort((a,b)=>b.score-a.score);if(ranked.length>1&&ranked[0].score===ranked[1].score){r.phase='tie';r.champion=null;r.tieIds=ranked.filter(p=>p.score===ranked[0].score).map(p=>p.id);r.round={type:'guess',title:'Sudden Death',question:'How many seconds are in 1 day?',correct:86400,tolerance:86400,step:0,stepCount:1};r.players.forEach(p=>{p.answered=!r.tieIds.includes(p.id);p.partial=[];p.submittedAt=0});r.endAt=now()+20000;const nonce=r.roundNonce;push(r);setTimeout(()=>{if(r.roundNonce!==nonce||r.phase!=='tie')return;const tied=r.players.filter(p=>r.tieIds.includes(p.id)).map(p=>({p,error:Math.abs(Number(p.partial[0]??-999999)-86400)})).sort((a,b)=>a.error-b.error);if(tied.length>1&&tied[0].error===tied[1].error){r.phase='done';r.champion=tied.filter(x=>x.error===tied[0].error).map(x=>x.p.name).join(' & ')}else{r.phase='done';r.champion=tied[0]?.p.name}push(r)},20000);return}
- r.phase='done';r.champion=ranked[0]?.name||'No winner';push(r)}
+function beginTiebreak(r,playerIds){
+ r.roundNonce=(r.roundNonce||0)+1;
+ const nonce=r.roundNonce;
+ const candidates=[
+ ['How many seconds are in one hour?',3600,3600],
+ ['How many minutes are in a week?',10080,10080],
+ ['How many days are in five weeks?',35,35],
+ ['How many hours are in eight days?',192,192],
+ ['How many minutes are in a day?',1440,1440],
+ ['How many centimeters are in twelve meters?',1200,1200]
+ ];
+ const q=candidates[((r.tieNumber||0)++)%candidates.length];
+ r.phase='tie';r.champion=null;r.tieIds=playerIds;
+ r.round={type:'guess',title:'Sudden Death',question:q[0],correct:q[1],tolerance:q[2],options:null,step:0,stepCount:1};
+ for(const p of r.players){p.answered=!playerIds.includes(p.id);p.partial=[];p.submittedAt=0}
+ r.endAt=now()+20000;push(r);
+ setTimeout(()=>{
+  if(r.roundNonce!==nonce||r.phase!=='tie')return;
+  const ranked=r.players.filter(p=>r.tieIds.includes(p.id)).map(p=>({p,error:p.submittedAt?Math.abs(p.partial[0]-q[1]):Infinity})).sort((a,b)=>a.error-b.error);
+  if(!ranked.length){r.phase='done';r.champion='No winner';push(r);return}
+  const best=ranked.filter(x=>x.error===ranked[0].error);
+  if(best.length>1){beginTiebreak(r,best.map(x=>x.p.id));return}
+  r.phase='done';r.champion=best[0].p.name;push(r);
+ },20000);
+}
+function endMatch(r){
+ const ranked=[...r.players].sort((a,b)=>b.score-a.score);
+ if(ranked.length>1&&ranked[0].score===ranked[1].score){
+  r.tieNumber=0;beginTiebreak(r,ranked.filter(p=>p.score===ranked[0].score).map(p=>p.id));return;
+ }
+ r.phase='done';r.champion=ranked[0]?.name||'No winner';push(r);
+}
 function resetLobby(r){
  r.roundNonce=(r.roundNonce||0)+1;
  r.phase='lobby';r.round=null;r.results=null;r.champion=null;r.roundIndex=0;r.endAt=0;r.tieIds=[];
@@ -54,7 +84,7 @@ function api(req,res,body){try{const b=JSON.parse(body||'{}'),route=req.url.spli
  }catch(e){return response(res,400,{error:e.message})}}
 const mime={'.html':'text/html','.css':'text/css','.js':'text/javascript','.svg':'image/svg+xml'};
 const server=http.createServer((req,res)=>{const pathname=new URL(req.url,'http://localhost').pathname;
- if(req.method==='GET'&&pathname==='/events'){const token=new URL(req.url,'http://localhost').searchParams.get('token'),c=sessions.get(token);if(!c||!rooms.has(c))return response(res,401,{error:'Invalid session'});const r=rooms.get(c);res.writeHead(200,{'Content-Type':'text/event-stream','Cache-Control':'no-cache, no-transform','Connection':'keep-alive'});r.clients.set(token,res);const p=r.players.concat(r.spectators).find(x=>x.token===token);if(p)p.online=true;res.write('data: '+JSON.stringify(publicState(r,token))+'\n\n');const heartbeat=setInterval(()=>{try{res.write(': ping\n\n')}catch{}},15000);req.on('close',()=>{clearInterval(heartbeat);r.clients.delete(token);if(p){p.online=false;if(r.host===p.id){const other=r.players.find(x=>x.online);if(other)r.host=other.id}push(r)}});return}
+ if(req.method==='GET'&&pathname==='/events'){const token=new URL(req.url,'http://localhost').searchParams.get('token'),c=sessions.get(token);if(!c||!rooms.has(c))return response(res,401,{error:'Invalid session'});const r=rooms.get(c);res.writeHead(200,{'Content-Type':'text/event-stream','Cache-Control':'no-cache, no-transform','Connection':'keep-alive'});r.clients.set(token,res);const p=r.players.concat(r.spectators).find(x=>x.token===token);if(p)p.online=true;res.write('data: '+JSON.stringify(publicState(r,token))+'\n\n');push(r);const heartbeat=setInterval(()=>{try{res.write(': ping\n\n')}catch{}},15000);res.on('close',()=>{clearInterval(heartbeat);if(r.clients.get(token)!==res)return;r.clients.delete(token);if(p){p.online=false;push(r);if(r.host===p.id){setTimeout(()=>{if(!p.online&&r.host===p.id){const other=r.players.find(x=>x.online);if(other){r.host=other.id;push(r)}}},30000)}}});return}
  if(req.method==='POST'&&pathname.startsWith('/api/')){let body='';req.on('data',chunk=>{body+=chunk;if(body.length>10000)req.destroy()});req.on('end',()=>api(req,res,body));return}
  if(req.method==='GET'){
   // The game works with index.html in either /public or the repository root.
