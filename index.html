@@ -108,7 +108,35 @@ async function input(){if(s?.phase!=='playing'||s.isSpectator||sending||s.gameId
 setInterval(input,80);
 function rounded(x,y,w,h,r){g.beginPath();g.roundRect(x,y,w,h,r)}
 function makeDust(f){let color=f.type==='pickup'?'#7affcc':f.type==='ko'?'#ffbd6c':f.type==='shield'?'#8adfff':f.type==='dash'?'#b58afa':'#ff7996';for(let i=0;i<15;i++){const a=Math.random()*6.28,v=70+Math.random()*220;dust.push({x:f.x,y:f.y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,color,life:.65})}if(dust.length>250)dust.splice(0,dust.length-250)}
-function scenery(t){const w=s.arena.w,h=s.arena.h;let bg=g.createRadialGradient(900,540,30,900,540,950);bg.addColorStop(0,'#1a3755');bg.addColorStop(1,'#071528');g.fillStyle=bg;g.fillRect(0,0,w,h);g.strokeStyle='#508ca52d';g.lineWidth=1;g.beginPath();for(let x=0;x<w;x+=60){g.moveTo(x,0);g.lineTo(x,h)}for(let y=0;y<h;y+=60){g.moveTo(0,y);g.lineTo(w,y)}g.stroke();g.save();g.translate(900,540);g.rotate(.25);for(let r=140;r<=360;r+=105){g.strokeStyle='rgba(104,230,215,'+(.08+.03*Math.sin(t*2+r))+')';g.lineWidth=6;g.beginPath();g.arc(0,0,r,0,6.283);g.stroke()}g.restore();g.strokeStyle='#62e6ea88';g.lineWidth=7;g.shadowColor='#74d9ed';g.shadowBlur=15;g.strokeRect(8,8,w-16,h-16);g.shadowBlur=0;for(const o of s.arena.obstacles){let gr=g.createLinearGradient(o.x,o.y,o.x,o.y+o.h);gr.addColorStop(0,'#355a76');gr.addColorStop(1,'#132d49');g.fillStyle=gr;rounded(o.x,o.y,o.w,o.h,12);g.fill();g.strokeStyle='#6bbebd95';g.lineWidth=3;g.stroke();g.fillStyle='#b9ffec10';rounded(o.x+10,o.y+10,o.w-20,o.h-20,5);g.fill()}}
+function scenery(t){
+ const w=s.arena.w,h=s.arena.h;
+ if(s.gameId==='jumping'){
+  const sky=g.createLinearGradient(0,0,0,h);sky.addColorStop(0,'#173a74');sky.addColorStop(.55,'#367ca7');sky.addColorStop(1,'#a0d6d7');
+  g.fillStyle=sky;g.fillRect(0,0,w,h);
+  for(let i=0;i<15;i++){let x=(i*229+35)%w,y=190+(i*89)%350;g.fillStyle='#e2faff29';g.beginPath();g.ellipse(x,y,90+(i%3)*25,25,0,0,6.283);g.fill()}
+  for(const pl of s.platforms||[]){
+   g.fillStyle='#13344b';rounded(pl.x+6,pl.y+9,pl.w,pl.h,11);g.fill();
+   const gr=g.createLinearGradient(pl.x,pl.y,pl.x,pl.y+pl.h);gr.addColorStop(0,'#64efd7');gr.addColorStop(1,'#285778');
+   g.fillStyle=gr;rounded(pl.x,pl.y,pl.w,pl.h,10);g.fill();
+   g.fillStyle='#b9fff4';g.fillRect(pl.x+8,pl.y+2,Math.max(0,pl.w-16),4);
+  }
+  g.fillStyle='#ffe893';g.fillRect(1710,786,8,132);
+  g.fillStyle='#ff87b2';g.beginPath();g.moveTo(1718,787);g.lineTo(1770,808);g.lineTo(1718,830);g.fill();
+  return;
+ }
+ if(s.gameId==='space'){
+  g.fillStyle='#05091d';g.fillRect(0,0,w,h);
+  let nebula=g.createRadialGradient(1040,550,70,980,560,1050);
+  nebula.addColorStop(0,'#192d5b');nebula.addColorStop(.54,'#141935');nebula.addColorStop(1,'#05091d');
+  g.fillStyle=nebula;g.fillRect(0,0,w,h);
+  for(let i=0;i<170;i++){
+   let x=(i*739.19+41)%w,y=(i*313.73+91)%h;
+   g.globalAlpha=.35+.5*Math.abs(Math.sin(t*.4+i));
+   g.fillStyle=i%9===0?'#9ad7ff':'#ecf7ff';g.fillRect(x,y,i%13===0?3:1.6,i%13===0?3:1.6);
+  }
+  g.globalAlpha=1;g.strokeStyle='#7999ff39';g.lineWidth=5;g.strokeRect(8,8,w-16,h-16);return;
+ }
+ let bg=g.createRadialGradient(900,540,30,900,540,950);bg.addColorStop(0,'#1a3755');bg.addColorStop(1,'#071528');g.fillStyle=bg;g.fillRect(0,0,w,h);g.strokeStyle='#508ca52d';g.lineWidth=1;g.beginPath();for(let x=0;x<w;x+=60){g.moveTo(x,0);g.lineTo(x,h)}for(let y=0;y<h;y+=60){g.moveTo(0,y);g.lineTo(w,y)}g.stroke();g.save();g.translate(900,540);g.rotate(.25);for(let r=140;r<=360;r+=105){g.strokeStyle='rgba(104,230,215,'+(.08+.03*Math.sin(t*2+r))+')';g.lineWidth=6;g.beginPath();g.arc(0,0,r,0,6.283);g.stroke()}g.restore();g.strokeStyle='#62e6ea88';g.lineWidth=7;g.shadowColor='#74d9ed';g.shadowBlur=15;g.strokeRect(8,8,w-16,h-16);g.shadowBlur=0;for(const o of s.arena.obstacles){let gr=g.createLinearGradient(o.x,o.y,o.x,o.y+o.h);gr.addColorStop(0,'#355a76');gr.addColorStop(1,'#132d49');g.fillStyle=gr;rounded(o.x,o.y,o.w,o.h,12);g.fill();g.strokeStyle='#6bbebd95';g.lineWidth=3;g.stroke();g.fillStyle='#b9ffec10';rounded(o.x+10,o.y+10,o.w-20,o.h-20,5);g.fill()}}
 function modeDecor(t){
  if(s.gameId==='crystals'){
   for(const q of s.gems||[]){
