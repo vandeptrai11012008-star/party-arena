@@ -40,7 +40,7 @@ function beginTiebreak(r,playerIds){
  ['How many minutes are in a day?',1440,1440],
  ['How many centimeters are in twelve meters?',1200,1200]
  ];
- const q=candidates[((r.tieNumber||0)++)%candidates.length];
+ const q=candidates[(r.tieNumber||0)%candidates.length];r.tieNumber=(r.tieNumber||0)+1;
  r.phase='tie';r.champion=null;r.tieIds=playerIds;
  r.round={type:'guess',title:'Sudden Death',question:q[0],correct:q[1],tolerance:q[2],options:null,step:0,stepCount:1};
  for(const p of r.players){p.answered=!playerIds.includes(p.id);p.partial=[];p.submittedAt=0}
