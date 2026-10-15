@@ -1,29 +1,55 @@
-# Party Arena — local multiplayer prototype
+# Party Arena — Neon Rumble (2D Multiplayer)
 
-## Requirements
-- Node.js 18 or newer. No npm dependencies or package installation needed.
+A polished real-time browser arena for **2–8 players**. This edition replaces every quiz, trivia question, and pattern puzzle with shared top-down 2D action.
 
-## Run
-1. Extract the ZIP file.
-2. Open a terminal in the `party-arena` folder.
-3. Run `node server.js` (or `npm start`).
-4. Open **http://localhost:3000** on the same computer.
-5. Open a second browser/incognito window to join with a room code and test 2 players.
+## Live game
+Render deployment: https://party-arena-2.onrender.com/
 
-## Playing on multiple devices
-All devices must be on the same Wi-Fi network. Find the computer's LAN IPv4 address, for example `192.168.1.25`, and visit `http://192.168.1.25:3000` on the other devices. Your firewall may ask you to allow Node.js connections. `localhost` only works on the host computer. To play across the internet, deploy the Node.js server to a hosting provider with a public HTTPS address.
+If your Render service uses another hostname, open its URL in the Render dashboard.
 
-## Features
-- 2–8 players, 6-character room codes, 6 rounds, live leaderboard
-- Trivia Blitz, Memory Flash, Quick Guess, Pattern Dash
-- 30-second rounds, 3-second countdown, 8-second results
-- Up to 150 points per round, 900 total
-- Server authoritative timers and scoring
-- Late joins as spectators; reconnect using the same browser/session
-- Host reassignment when host disconnects; rematches
+## How to play
 
-## Prototype limitations
-- Rooms and scores are in memory: server restart clears them.
-- Reconnection is best effort; closed tabs can reconnect with the browser's saved token.
-- No public hosting, user accounts, chat, matchmaking, or moderation dashboard.
-- Sudden-death tie breaker resolves closest answer; exact ties share victory in this prototype.
+1. Open the same website on each device.
+2. The host creates a room; other players join using its six-character code.
+3. When 2–8 players have joined, the host clicks **Start Match**.
+4. After a four-second countdown, players compete in a 150-second arena match.
+5. Earn **100 points per elimination** and **10 points per successful hit**. Collect power-ups and use cover.
+6. The highest score wins. The host can start a rematch or return everyone to the lobby.
+
+### Controls
+**Desktop:** WASD or arrow keys to move; mouse to aim; hold left-click or Space to fire; Shift / E to dash.
+
+**Mobile:** On-screen movement joystick, FIRE (auto-aim at nearest opponent), and DASH.
+
+### Power-ups
+- Green: restore health
+- Cyan: temporary protective shield
+- Violet: temporary speed boost
+
+Eliminated players respawn after a short delay. New joiners during a match wait as spectators until the next match.
+
+## Running locally
+
+Requires Node.js 18 or newer.
+
+```bash
+node server.js
+```
+
+Open http://localhost:3000.
+
+## Deploying on Render
+
+- Service type: **Web Service**
+- Runtime: **Node**
+- Build command: `npm install`
+- Start command: `node server.js`
+- Publish on the `main` branch
+
+No external npm dependencies are required.
+
+The server handles player movement, collision, projectiles, hit detection, power-ups, respawns, rounds and scores. Browsers receive live snapshots using Server-Sent Events (SSE) and send controls via HTTP API.
+
+## Limitations
+
+Rooms and scores currently live in server memory; a Render free-tier restart will clear active rooms. Revisit the page to create a new room. No account system or persistent matchmaking is implemented yet. A stable Render deployment needs persistent storage to preserve rooms across restarts.
