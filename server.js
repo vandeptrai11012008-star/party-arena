@@ -33,7 +33,7 @@ function playerView(p){return {id:p.id,name:p.name,slot:p.slot,x:Math.round(p.x)
 function stateFor(r,token){
  const p=[...r.players,...r.spectators].find(x=>x.token===token);
  return {code:r.code,phase:r.phase,me:p?.id,host:r.host,isHost:p?.id===r.host,isSpectator:!!p&&!r.players.includes(p),
- serverNow:now(),endsAt:r.endsAt,round:r.round,gameId:r.gameId,games:Object.values(GAMES),players:r.players.map(playerView),spectators:r.spectators.map(x=>({id:x.id,name:x.name})),
+ serverNow:now(),endsAt:r.endsAt,round:r.round,gameId:r.gameId,practice:r.practice,games:Object.values(GAMES),players:r.players.map(playerView),spectators:r.spectators.map(x=>({id:x.id,name:x.name})),
  bullets:r.phase==='playing'?r.bullets.map(b=>({x:Math.round(b.x),y:Math.round(b.y),vx:b.vx,vy:b.vy,owner:b.owner})):[],
  pickups:r.phase==='playing'?r.pickups.filter(x=>x.active).map(x=>({x:x.x,y:x.y,type:x.type})):[],
  gems:r.gameId==='crystals'&&r.phase==='playing'?r.gems.filter(g=>g.active).map(g=>({x:Math.round(g.x),y:Math.round(g.y),rare:g.rare})):[],
@@ -49,14 +49,14 @@ function push(r){
   catch{r.clients.delete(token)}
  }
 }
-function createRoom(name){let code;do{code=newCode()}while(rooms.has(code));const p=makePlayer(name,0),r={code,players:[p],spectators:[],host:p.id,clients:new Map(),phase:'lobby',round:0,gameId:'rumble',endsAt:0,bullets:[],pickups:[],gems:[],zones:[],meteors:[],meteorTimer:0,scoreTimer:0,fx:[],champion:'',lastTick:now(),lastPush:0,activeAt:now()};rooms.set(code,r);sessions.set(p.token,code);return {r,p}}
+function createRoom(name){let code;do{code=newCode()}while(rooms.has(code));const p=makePlayer(name,0),r={code,players:[p],spectators:[],host:p.id,clients:new Map(),phase:'lobby',round:0,gameId:'rumble',practice:false,endsAt:0,bullets:[],pickups:[],gems:[],zones:[],meteors:[],meteorTimer:0,scoreTimer:0,fx:[],champion:'',lastTick:now(),lastPush:0,activeAt:now()};rooms.set(code,r);sessions.set(p.token,code);return {r,p}}
 function nextSlot(r){const slots=new Set([...r.players,...r.spectators].map(p=>p.slot));for(let i=0;i<8;i++)if(!slots.has(i))return i;return 0}
-function toLobby(r){r.phase='lobby';r.round=0;r.endsAt=0;r.champion='';r.bullets=[];r.pickups=[];r.gems=[];r.zones=[];r.meteors=[];r.meteorTimer=0;r.scoreTimer=0;r.fx=[];r.players.push(...r.spectators.splice(0,8-r.players.length));for(const p of r.players)resetPlayer(p);push(r)}
-function start(r){if(r.players.length<2)fault('At least 2 players are required to start.');
+function toLobby(r){r.phase='lobby';r.practice=false;r.round=0;r.endsAt=0;r.champion='';r.bullets=[];r.pickups=[];r.gems=[];r.zones=[];r.meteors=[];r.meteorTimer=0;r.scoreTimer=0;r.fx=[];r.players.push(...r.spectators.splice(0,8-r.players.length));for(const p of r.players)resetPlayer(p);push(r)}
+function start(r,practice=false){if(r.players.length<2&&!practice)fault('At least 2 players are required to start, or choose Solo Practice.');
  if(r.phase!=='lobby'&&r.phase!=='done')fault('The match is already running.');
  r.players.push(...r.spectators.splice(0,8-r.players.length));
  for(const p of r.players)resetPlayer(p);
- r.round++;r.phase='countdown';r.endsAt=now()+4000;r.bullets=[];r.fx=[];r.champion='';r.gems=[];r.zones=[];r.meteors=[];r.meteorTimer=0;r.scoreTimer=0;
+ r.practice=practice&&r.players.length===1;r.round++;r.phase='countdown';r.endsAt=now()+4000;r.bullets=[];r.fx=[];r.champion='';r.gems=[];r.zones=[];r.meteors=[];r.meteorTimer=0;r.scoreTimer=0;
  r.pickups=r.gameId==='crystals'?[]:PICKSPOTS.map((a,i)=>({x:a[0],y:a[1],type:['heal','shield','speed'][i%3],active:true,respawn:0}));
  if(r.gameId==='crystals')for(let i=0;i<34;i++)r.gems.push(newGem(i));
  if(r.gameId==='zones')r.zones=[{x:425,y:555,r:135,owner:null,contested:false},{x:905,y:295,r:135,owner:null,contested:false},{x:1375,y:555,r:135,owner:null,contested:false}];
@@ -210,7 +210,7 @@ function api(req,res,body){
    if(!Object.prototype.hasOwnProperty.call(GAMES,b.gameId))fault('Unknown game mode');
    r.gameId=b.gameId;push(r);return json(res,200,{ok:true,gameId:r.gameId});
   }
-  if(route==='/api/start'){if(r.host!==p.id)fault('Only the host can start the match');start(r);return json(res,200,{ok:true})}
+  if(route==='/api/start'){if(r.host!==p.id)fault('Only the host can start the match');start(r,b.practice===true);return json(res,200,{ok:true})}
   if(route==='/api/lobby'){if(r.host!==p.id)fault('Only the host can return to lobby');toLobby(r);return json(res,200,{ok:true})}
   if(route==='/api/input'){
    if(r.phase!=='playing'||!r.players.includes(p))return json(res,200,{ok:true});
