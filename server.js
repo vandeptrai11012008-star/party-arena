@@ -124,6 +124,7 @@ function api(req,res,body){
   if(route==='/api/create'){const name=cleanName(b.name);if(!name)fault('Enter your nickname first');const {r,p}=createRoom(name);return json(res,200,{token:p.token,code:r.code})}
   if(route==='/api/join'){const r=getRoom(b.code),name=cleanName(b.name);if(!name)fault('Enter your nickname first');if(r.players.length+r.spectators.length>=8)fault('Room full (8 players maximum)');const p=makePlayer(name,nextSlot(r));if(r.phase==='lobby')r.players.push(p);else r.spectators.push(p);sessions.set(p.token,r.code);r.activeAt=now();push(r);return json(res,200,{token:p.token,code:r.code})}
   const {r,p}=getAuth(b.token);r.activeAt=now();
+  if(route==='/api/resume')return json(res,200,{ok:true});
   if(route==='/api/start'){if(r.host!==p.id)fault('Only the host can start the match');start(r);return json(res,200,{ok:true})}
   if(route==='/api/lobby'){if(r.host!==p.id)fault('Only the host can return to lobby');toLobby(r);return json(res,200,{ok:true})}
   if(route==='/api/input'){
