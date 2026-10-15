@@ -1,55 +1,38 @@
-# Party Arena — Neon Rumble (2D Multiplayer)
+# Party Arena — Four Worlds (2–8 Players)
 
-A polished real-time browser arena for **2–8 players**. This edition replaces every quiz, trivia question, and pattern puzzle with shared top-down 2D action.
+Four playable minigames, selected by the room host from a shared lobby:
 
-## Live game
-Render deployment: https://party-arena-2.onrender.com/
+1. **Tank Survival (2D):** Drive a tank, avoid AI drones, collect power-ups and score points in combat.
+2. **Fishing 3D (first person):** The first-person WebGL lake experience from the original fishing prototype. Aim, cast, wait for a bite and reel using Space while managing line tension. Each successful catch awards room points. Everyone fishes in their own first-person lake view with a shared scoreboard, not a synchronized 3D world.
+3. **Skybound Jumping (2D):** Jump across platforms, collect stars and reach the finish flag for lap points. A/D and Space (or mobile move and JUMP).
+4. **Space Evolution (2D):** Fly around a star field, avoid asteroids, collect boosts and shoot asteroids for points.
 
-If your Render service uses another hostname, open its URL in the Render dashboard.
+## Live page
+
+Render URL previously configured: https://party-arena-2.onrender.com/ (verify service URL and latest deployment in the Render dashboard).
 
 ## How to play
 
-1. Open the same website on each device.
-2. The host creates a room; other players join using its six-character code.
-3. When 2–8 players have joined, the host clicks **Start Match**.
-4. After a four-second countdown, players compete in a 150-second arena match.
-5. Earn **100 points per elimination** and **10 points per successful hit**. Collect power-ups and use cover.
-6. The highest score wins. The host can start a rematch or return everyone to the lobby.
+- Host creates a private room with a six-character code.
+- Other friends join from their own browsers (up to 8 players).
+- Host selects one of the four games from the **CHOOSE YOUR WORLD** cards.
+- With two or more players, press **START MATCH**. To test alone, press **TEST SOLO**.
+- Match length varies with mode (120–150 seconds). Host can replay or go back to lobby.
+- Scoreboard and game rules are synchronized by the server. Fishing uses a first-person local simulation and reports catches to the room server with a minimum 6-second claim cooldown.
+- Sound is opt-in: press **MUSIC ON** for a low-volume, original procedural synth loop. No licensed music is included.
 
-### Controls
-**Desktop:** WASD or arrow keys to move; mouse to aim; hold left-click or Space to fire; Shift / E to dash.
+## Development
 
-**Mobile:** On-screen movement joystick, FIRE (auto-aim at nearest opponent), and DASH.
-
-### Power-ups
-- Green: restore health
-- Cyan: temporary protective shield
-- Violet: temporary speed boost
-
-Eliminated players respawn after a short delay. New joiners during a match wait as spectators until the next match.
-
-## Running locally
-
-Requires Node.js 18 or newer.
+Pure Node.js server (no npm dependencies):
 
 ```bash
 node server.js
 ```
 
-Open http://localhost:3000.
+Open http://localhost:3000, then join with another tab or device.
 
-## Deploying on Render
+Files: `server.js` handles room codes, movement, match timing and scoring; `index.html` contains the lobby and 2D Canvas games; `fishing.html` contains the original first-person WebGL fishing experience, integrated into the match as an iframe.
 
-- Service type: **Web Service**
-- Runtime: **Node**
-- Build command: `npm install`
-- Start command: `node server.js`
-- Publish on the `main` branch
+## Free Render deployment
 
-No external npm dependencies are required.
-
-The server handles player movement, collision, projectiles, hit detection, power-ups, respawns, rounds and scores. Browsers receive live snapshots using Server-Sent Events (SSE) and send controls via HTTP API.
-
-## Limitations
-
-Rooms and scores currently live in server memory; a Render free-tier restart will clear active rooms. Revisit the page to create a new room. No account system or persistent matchmaking is implemented yet. A stable Render deployment needs persistent storage to preserve rooms across restarts.
+Runtime: Node, Build: `npm install`, Start: `node server.js`. Rooms and scores are stored in server memory only. They disappear when the server restarts or the Render free instance sleeps. This project is a functional prototype, not a production-grade scalable multiplayer service; players should expect some network delay.
