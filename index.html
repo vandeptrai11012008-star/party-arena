@@ -138,29 +138,31 @@ function scenery(t){
  }
  let bg=g.createRadialGradient(900,540,30,900,540,950);bg.addColorStop(0,'#1a3755');bg.addColorStop(1,'#071528');g.fillStyle=bg;g.fillRect(0,0,w,h);g.strokeStyle='#508ca52d';g.lineWidth=1;g.beginPath();for(let x=0;x<w;x+=60){g.moveTo(x,0);g.lineTo(x,h)}for(let y=0;y<h;y+=60){g.moveTo(0,y);g.lineTo(w,y)}g.stroke();g.save();g.translate(900,540);g.rotate(.25);for(let r=140;r<=360;r+=105){g.strokeStyle='rgba(104,230,215,'+(.08+.03*Math.sin(t*2+r))+')';g.lineWidth=6;g.beginPath();g.arc(0,0,r,0,6.283);g.stroke()}g.restore();g.strokeStyle='#62e6ea88';g.lineWidth=7;g.shadowColor='#74d9ed';g.shadowBlur=15;g.strokeRect(8,8,w-16,h-16);g.shadowBlur=0;for(const o of s.arena.obstacles){let gr=g.createLinearGradient(o.x,o.y,o.x,o.y+o.h);gr.addColorStop(0,'#355a76');gr.addColorStop(1,'#132d49');g.fillStyle=gr;rounded(o.x,o.y,o.w,o.h,12);g.fill();g.strokeStyle='#6bbebd95';g.lineWidth=3;g.stroke();g.fillStyle='#b9ffec10';rounded(o.x+10,o.y+10,o.w-20,o.h-20,5);g.fill()}}
 function modeDecor(t){
- if(s.gameId==='crystals'){
-  for(const q of s.gems||[]){
-   const color=q.rare?'#ffd07a':'#7cf8e6',size=q.rare?23:16;
-   g.save();g.translate(q.x,q.y);g.rotate(t*.6+q.x*.01);g.shadowBlur=21;g.shadowColor=color;g.fillStyle=q.rare?'#e49a2c':'#36c9bc';g.strokeStyle=color;g.lineWidth=3;
-   g.beginPath();g.moveTo(0,-size);g.lineTo(size*.83,0);g.lineTo(0,size);g.lineTo(-size*.83,0);g.closePath();g.fill();g.stroke();
-   g.restore();
+ if(s.gameId==='tank'){
+  for(const m of s.mobs||[]){
+   g.save();g.translate(m.x,m.y);g.rotate(t*.3+m.x*.002);
+   g.fillStyle='#512944';g.strokeStyle='#ffae82';g.lineWidth=3;
+   rounded(-25,-20,50,40,9);g.fill();g.stroke();
+   g.fillStyle='#ffb68e';g.fillRect(-13,-5,26,10);g.restore();
   }
  }
- if(s.gameId==='zones'){
-  for(const z of s.zones||[]){
-   const player=s.players.find(p=>p.id===z.owner),col=z.contested?'#ffba6a':player?C[player.slot]:'#7d8da8';
-   g.save();g.globalAlpha=.10;g.fillStyle=col;g.beginPath();g.arc(z.x,z.y,z.r,0,Math.PI*2);g.fill();g.globalAlpha=.9;
-   g.strokeStyle=col;g.lineWidth=8;g.shadowBlur=14;g.shadowColor=col;g.beginPath();g.arc(z.x,z.y,z.r+Math.sin(t*3)*2,0,Math.PI*2);g.stroke();
-   g.shadowBlur=0;g.fillStyle=col;g.font='900 23px system-ui';g.textAlign='center';g.fillText(z.contested?'CONTESTED':player?'CAPTURED':'CONTROL',z.x,z.y);
-   g.restore();
+ if(s.gameId==='jumping'){
+  for(const q of s.stars||[]){
+   g.save();g.translate(q.x,q.y+Math.sin(t*3+q.x)*5);g.rotate(t*.8);
+   g.fillStyle='#ffdf7c';g.beginPath();
+   for(let j=0;j<10;j++){const r=j%2?10:22,a=-Math.PI/2+j*Math.PI/5,x=Math.cos(a)*r,y=Math.sin(a)*r;if(j===0)g.moveTo(x,y);else g.lineTo(x,y)}
+   g.closePath();g.fill();g.restore();
   }
  }
- if(s.gameId==='meteors'){
-  for(const m of s.meteors||[]){
-   g.save();g.shadowColor='#ff9650';g.shadowBlur=23;g.strokeStyle='#ff9e5b';g.lineWidth=7;
-   g.beginPath();g.moveTo(m.x-m.r*.55,m.y-m.r*2.7);g.lineTo(m.x,m.y);g.stroke();
-   g.fillStyle='#b54f48';g.beginPath();g.arc(m.x,m.y,m.r,0,Math.PI*2);g.fill();g.strokeStyle='#ffc783';g.lineWidth=3;g.stroke();
-   g.shadowBlur=0;g.restore();
+ if(s.gameId==='space'){
+  for(const m of s.asteroids||[]){
+   g.save();g.translate(m.x,m.y);g.rotate(t*.14+m.x*.008);
+   g.fillStyle='#716e91';g.strokeStyle='#b5acd1';g.lineWidth=3;
+   g.beginPath();
+   for(let j=0;j<9;j++){const a=j*Math.PI*2/9,rad=m.r*(.8+.13*Math.sin(j*18+m.x));if(j===0)g.moveTo(Math.cos(a)*rad,Math.sin(a)*rad);else g.lineTo(Math.cos(a)*rad,Math.sin(a)*rad)}
+   g.closePath();g.fill();g.stroke();g.fillStyle='#4a506e';
+   g.beginPath();g.arc(-m.r*.25,-m.r*.14,m.r*.18,0,6.283);g.fill();g.beginPath();g.arc(m.r*.27,m.r*.19,m.r*.12,0,6.283);g.fill();
+   g.restore();
   }
  }
 }
