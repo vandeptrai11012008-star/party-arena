@@ -28,19 +28,19 @@ function getRoom(code){const r=rooms.get(String(code||'').trim().toUpperCase());
 function getAuth(token){const c=sessions.get(String(token||''));if(!c)fault('Session expired. Please create or join a room.',401);const r=getRoom(c),p=[...r.players,...r.spectators].find(p=>p.token===token);if(!p)fault('Player no longer in this room.',401);return {r,p}}
 function cleanName(n){return String(n||'').trim().replace(/[<>]/g,'').slice(0,18)}
 function makePlayer(name,slot){return {id:uuid(),token:uuid(),name,slot,score:0,kills:0,deaths:0,x:SPAWNS[slot][0],y:SPAWNS[slot][1],angle:0,hp:100,shield:0,speedUntil:0,invUntil:0,respawnAt:0,online:false,fireAt:0,dashAt:0,dashHeld:false,input:{dx:0,dy:0,angle:0,fire:false,dash:false},lastInput:0}}
-function resetPlayer(p){const xy=SPAWNS[p.slot%SPAWNS.length];p.x=xy[0];p.y=xy[1];p.hp=100;p.shield=0;p.speedUntil=0;p.invUntil=now()+2000;p.respawnAt=0;p.fireAt=0;p.dashAt=0;p.dashHeld=false;p.score=0;p.kills=0;p.deaths=0;p.input={dx:0,dy:0,angle:0,fire:false,dash:false};p.lastInput=now()}
-function playerView(p){return {id:p.id,name:p.name,slot:p.slot,x:Math.round(p.x),y:Math.round(p.y),a:p.angle,hp:p.hp,shield:p.shield,score:p.score,kills:p.kills,deaths:p.deaths,online:p.online,respawnAt:p.respawnAt,invUntil:p.invUntil,speedUntil:p.speedUntil,dashAt:p.dashAt}}
+function resetPlayer(p){const xy=SPAWNS[p.slot%SPAWNS.length];p.vy=0;p.grounded=false;p.jumpHeld=false;p.lapCooldown=0;p.lastCatch=0;p.fishClaims=0;p.x=xy[0];p.y=xy[1];p.hp=100;p.shield=0;p.speedUntil=0;p.invUntil=now()+2000;p.respawnAt=0;p.fireAt=0;p.dashAt=0;p.dashHeld=false;p.score=0;p.kills=0;p.deaths=0;p.input={dx:0,dy:0,angle:0,fire:false,dash:false};p.lastInput=now()}
+function playerView(p){return {id:p.id,name:p.name,slot:p.slot,x:Math.round(p.x),y:Math.round(p.y),a:p.angle,hp:p.hp,shield:p.shield,score:p.score,kills:p.kills,deaths:p.deaths,online:p.online,respawnAt:p.respawnAt,invUntil:p.invUntil,speedUntil:p.speedUntil,dashAt:p.dashAt,vy:p.vy,grounded:p.grounded,fishClaims:p.fishClaims}}
 function stateFor(r,token){
  const p=[...r.players,...r.spectators].find(x=>x.token===token);
  return {code:r.code,phase:r.phase,me:p?.id,host:r.host,isHost:p?.id===r.host,isSpectator:!!p&&!r.players.includes(p),
  serverNow:now(),endsAt:r.endsAt,round:r.round,gameId:r.gameId,practice:r.practice,games:Object.values(GAMES),players:r.players.map(playerView),spectators:r.spectators.map(x=>({id:x.id,name:x.name})),
  bullets:r.phase==='playing'?r.bullets.map(b=>({x:Math.round(b.x),y:Math.round(b.y),vx:b.vx,vy:b.vy,owner:b.owner})):[],
  pickups:r.phase==='playing'?r.pickups.filter(x=>x.active).map(x=>({x:x.x,y:x.y,type:x.type})):[],
- gems:r.gameId==='fishing'&&r.phase==='playing'?r.gems.filter(g=>g.active).map(g=>({x:Math.round(g.x),y:Math.round(g.y),rare:g.rare})):[],
- zones:r.gameId==='jumping'?r.zones.map(z=>({x:z.x,y:z.y,r:z.r,owner:z.owner,contested:z.contested})):[],
- meteors:r.gameId==='space'&&r.phase==='playing'?r.meteors.map(m=>({x:Math.round(m.x),y:Math.round(m.y),r:m.r})):[],
+ stars:r.gameId==='jumping'&&r.phase==='playing'?r.gems.filter(g=>g.active).map(g=>({x:Math.round(g.x),y:Math.round(g.y)})):[],
+ platforms:r.gameId==='jumping'?PLATFORMS:[],
+ asteroids:r.gameId==='space'&&r.phase==='playing'?r.meteors.map(m=>({x:Math.round(m.x),y:Math.round(m.y),r:m.r,hp:m.hp})):[],mobs:r.gameId==='tank'&&r.phase==='playing'?r.mobs.map(m=>({x:Math.round(m.x),y:Math.round(m.y),hp:m.hp})):[],
  fx:r.phase==='playing'?r.fx.map(f=>({x:f.x,y:f.y,type:f.type,id:f.id})):[],
- champion:r.champion,arena:{w:W,h:H,obstacles:OBS}
+ champion:r.champion,arena:{w:W,h:H,obstacles:r.gameId==='tank'?OBS:[]}
  };
 }
 function push(r){
@@ -49,19 +49,36 @@ function push(r){
   catch{r.clients.delete(token)}
  }
 }
-function createRoom(name){let code;do{code=newCode()}while(rooms.has(code));const p=makePlayer(name,0),r={code,players:[p],spectators:[],host:p.id,clients:new Map(),phase:'lobby',round:0,gameId:'tank',practice:false,endsAt:0,bullets:[],pickups:[],gems:[],zones:[],meteors:[],meteorTimer:0,scoreTimer:0,fx:[],champion:'',lastTick:now(),lastPush:0,activeAt:now()};rooms.set(code,r);sessions.set(p.token,code);return {r,p}}
+function createRoom(name){let code;do{code=newCode()}while(rooms.has(code));const p=makePlayer(name,0),r={code,players:[p],spectators:[],host:p.id,clients:new Map(),phase:'lobby',round:0,gameId:'tank',practice:false,endsAt:0,bullets:[],pickups:[],gems:[],zones:[],meteors:[],mobs:[],meteorTimer:0,scoreTimer:0,fx:[],champion:'',lastTick:now(),lastPush:0,activeAt:now()};rooms.set(code,r);sessions.set(p.token,code);return {r,p}}
 function nextSlot(r){const slots=new Set([...r.players,...r.spectators].map(p=>p.slot));for(let i=0;i<8;i++)if(!slots.has(i))return i;return 0}
-function toLobby(r){r.phase='lobby';r.practice=false;r.round=0;r.endsAt=0;r.champion='';r.bullets=[];r.pickups=[];r.gems=[];r.zones=[];r.meteors=[];r.meteorTimer=0;r.scoreTimer=0;r.fx=[];r.players.push(...r.spectators.splice(0,8-r.players.length));for(const p of r.players)resetPlayer(p);push(r)}
-function start(r,practice=false){if(r.players.length<2&&!practice)fault('At least 2 players are required to start, or choose Solo Practice.');
- if(r.phase!=='lobby'&&r.phase!=='done')fault('The match is already running.');
+function toLobby(r){r.phase='lobby';r.practice=false;r.round=0;r.endsAt=0;r.champion='';r.bullets=[];r.pickups=[];r.gems=[];r.zones=[];r.meteors=[];r.mobs=[];r.meteorTimer=0;r.scoreTimer=0;r.fx=[];r.players.push(...r.spectators.splice(0,8-r.players.length));for(const p of r.players)resetPlayer(p);push(r)}
+const PLATFORMS=[
+ {x:0,y:945,w:255,h:135},{x:340,y:860,w:185,h:25},{x:615,y:780,w:195,h:25},
+ {x:892,y:875,w:180,h:25},{x:1165,y:795,w:180,h:25},{x:1430,y:865,w:180,h:25},
+ {x:1650,y:920,w:150,h:30}
+];
+function spawnDrone(r,i){
+ let x=900,y=500;for(let n=0;n<80;n++){x=rand(140,W-140);y=rand(140,H-140);if(canMove(x,y,36)&&r.players.every(p=>Math.hypot(p.x-x,p.y-y)>260))break}
+ return {x,y,hp:3,speed:rand(36,75),hitAt:now()+1200}
+}
+function spawnAsteroid(){
+ return {x:rand(100,W-100),y:rand(100,H-100),vx:rand(-95,95),vy:rand(-90,90),r:rand(21,40),hp:2,hitAt:0}
+}
+function start(r,practice=false){
+ if(r.players.length<2&&!practice)fault('At least 2 players required. Use TEST SOLO to practice.');
+ if(r.phase!=='lobby'&&r.phase!=='done')fault('Match already running.');
  r.players.push(...r.spectators.splice(0,8-r.players.length));
  for(const p of r.players)resetPlayer(p);
- r.practice=practice&&r.players.length===1;r.round++;r.phase='countdown';r.endsAt=now()+4000;r.bullets=[];r.fx=[];r.champion='';r.gems=[];r.zones=[];r.meteors=[];r.meteorTimer=0;r.scoreTimer=0;
- r.pickups=r.gameId==='fishing'?[]:PICKSPOTS.map((a,i)=>({x:a[0],y:a[1],type:['heal','shield','speed'][i%3],active:true,respawn:0}));
- if(r.gameId==='fishing')for(let i=0;i<34;i++)r.gems.push(newGem(i));
- if(r.gameId==='jumping')r.zones=[{x:425,y:555,r:135,owner:null,contested:false},{x:905,y:295,r:135,owner:null,contested:false},{x:1375,y:555,r:135,owner:null,contested:false}];
- r.startedAt=0;
- push(r);
+ r.practice=!!practice&&r.players.length===1;r.round++;r.phase='countdown';r.endsAt=now()+4000;
+ r.bullets=[];r.fx=[];r.champion='';r.gems=[];r.zones=[];r.meteors=[];r.mobs=[];
+ r.pickups=(r.gameId==='tank'||r.gameId==='space')?PICKSPOTS.map((a,i)=>({x:a[0],y:a[1],type:['heal','shield','speed'][i%3],active:true,respawn:0})):[];
+ if(r.gameId==='jumping'){
+  for(const p of r.players){p.x=75+p.slot*17;p.y=922;p.vy=0;p.grounded=true}
+  r.gems=PLATFORMS.slice(1).map((pl,i)=>({x:pl.x+pl.w/2,y:pl.y-52,active:true,respawn:0}))
+ }
+ if(r.gameId==='space')for(let i=0;i<18;i++)r.meteors.push(spawnAsteroid());
+ if(r.gameId==='tank')for(let i=0;i<6;i++)r.mobs.push(spawnDrone(r,i));
+ push(r)
 }
 function newGem(i){
  let x,y;for(let n=0;n<50;n++){x=rand(65,W-65);y=rand(65,H-65);if(canMove(x,y,24))break}
@@ -71,7 +88,7 @@ function newGem(i){
 function canMove(x,y,r=22){return x>=r&&x<=W-r&&y>=r&&y<=H-r&&!OBS.some(o=>x+r>o.x&&x-r<o.x+o.w&&y+r>o.y&&y-r<o.y+o.h)}
 function move(p,dx,dy){let nx=clamp(p.x+dx,23,W-23),ny=clamp(p.y+dy,23,H-23);if(canMove(nx,p.y))p.x=nx;if(canMove(p.x,ny))p.y=ny}
 function fire(r,p,t){
- if(t<p.fireAt||p.respawnAt||r.gameId==='fishing')return;
+ if(t<p.fireAt||p.respawnAt||r.gameId==='fishing'||r.gameId==='jumping')return;
  p.fireAt=t+240;
  const a=p.angle,speed=710;const x=p.x+Math.cos(a)*31,y=p.y+Math.sin(a)*31;
  r.bullets.push({x,y,prevX:x,prevY:y,vx:Math.cos(a)*speed,vy:Math.sin(a)*speed,owner:p.id,expires:t+1150});
@@ -83,108 +100,117 @@ function hit(r,p,shooter,t){
  if(p.respawnAt||p.invUntil>t)return;
  if(p.shield>0){p.shield--;effect(r,p.x,p.y,'shield');return}
  p.hp=Math.max(0,p.hp-25);effect(r,p.x,p.y,'hit');
- if(p.hp===0){p.deaths++;p.respawnAt=t+2600;p.input.fire=false;shooter.score+=r.gameId==='jumping'?25:100;shooter.kills++;effect(r,p.x,p.y,'ko')}
- else shooter.score+=r.gameId==='jumping'?3:10;
+ if(p.hp===0){p.deaths++;p.respawnAt=t+2600;p.input.fire=false;shooter.score+=100;shooter.kills++;effect(r,p.x,p.y,'ko')}
+ else shooter.score+=10;
 }
 function endGame(r){r.phase='done';r.endsAt=0;const sorted=[...r.players].sort((a,b)=>b.score-a.score||a.deaths-b.deaths);const highest=sorted[0]?.score??0;r.champion=sorted.filter(p=>p.score===highest).map(p=>p.name).join(' & ');r.bullets=[];push(r)}
-function meteorDamage(r,p,t){
- if(p.respawnAt||p.invUntil>t)return;
- if(p.shield>0){p.shield--;effect(r,p.x,p.y,'shield');p.invUntil=t+300;return}
- p.hp=Math.max(0,p.hp-34);p.invUntil=t+400;effect(r,p.x,p.y,'hit');
- if(p.hp<=0){p.deaths++;p.respawnAt=t+2300;p.input.fire=false;effect(r,p.x,p.y,'ko')}
+function tickJumping(r,t,dt){
+ for(const p of r.players){
+  const i=t-p.lastInput<950?p.input:{dx:0,jump:false,dash:false};
+  const jump=!!(i.jump||i.dash);
+  if(jump&&!p.jumpHeld&&p.grounded){p.vy=-700;p.grounded=false;effect(r,p.x,p.y,'dash')}
+  p.jumpHeld=jump;
+  p.x=clamp(p.x+clamp(i.dx,-1,1)*295*dt,23,W-23);
+  const oldY=p.y;p.vy=Math.min(960,p.vy+1520*dt);p.y+=p.vy*dt;p.grounded=false;
+  for(const pl of PLATFORMS){
+   if(p.vy>=0&&p.x+20>pl.x&&p.x-20<pl.x+pl.w&&oldY+23<=pl.y+14&&p.y+23>=pl.y){
+    p.y=pl.y-23;p.vy=0;p.grounded=true;break
+   }
+  }
+  if(p.y>H+45){p.x=76+p.slot*17;p.y=922;p.vy=0;p.deaths++;effect(r,p.x,p.y,'hit')}
+  if(p.x>1710&&p.y<970&&t>p.lapCooldown){p.score+=170;p.kills++;p.lapCooldown=t+2700;p.x=77;p.y=922;p.vy=0;effect(r,1720,870,'pickup')}
+ }
+ for(const star of r.gems){
+  if(!star.active){if(t>=star.respawn)star.active=true;continue}
+  for(const p of r.players)if(Math.hypot(p.x-star.x,p.y-star.y)<45){
+   star.active=false;star.respawn=t+9000;p.score+=40;effect(r,star.x,star.y,'pickup');break
+  }
+ }
+ r.fx=r.fx.filter(f=>f.until>t);
 }
-function modeStep(r,t,dt){
- if(r.gameId==='fishing'){
-  for(const g of r.gems){
-   if(!g.active){if(t>=g.respawn){const n=newGem(Math.floor(rand(0,40)));g.x=n.x;g.y=n.y;g.active=true}continue}
-   for(const p of r.players){
-    if(p.respawnAt)continue;
-    if(Math.hypot(p.x-g.x,p.y-g.y)<=45){
-     p.score+=g.rare?65:20;g.active=false;g.respawn=t+rand(700,1700);
-     effect(r,g.x,g.y,'gem');break
-    }
-   }
+function tickDrones(r,t,dt){
+ for(const m of r.mobs){
+  const candidates=r.players.filter(p=>!p.respawnAt);
+  if(!candidates.length)continue;
+  const target=candidates.reduce((a,b)=>Math.hypot(a.x-m.x,a.y-m.y)<Math.hypot(b.x-m.x,b.y-m.y)?a:b);
+  const a=Math.atan2(target.y-m.y,target.x-m.x);
+  const x=m.x+Math.cos(a)*m.speed*dt,y=m.y+Math.sin(a)*m.speed*dt;
+  if(canMove(x,y,30)){m.x=x;m.y=y}
+  if(Math.hypot(m.x-target.x,m.y-target.y)<34&&t>m.hitAt&&target.invUntil<t){
+   m.hitAt=t+1100;
+   if(target.shield>0)target.shield--;else target.hp=Math.max(0,target.hp-19);
+   effect(r,target.x,target.y,'hit');
+   if(target.hp<=0){target.deaths++;target.respawnAt=t+2300;effect(r,target.x,target.y,'ko')}
   }
  }
- if(r.gameId==='jumping'){
-  r.scoreTimer+=dt;
-  if(r.scoreTimer>=.5){
-   r.scoreTimer%=.5;
-   for(const z of r.zones){
-    const inside=r.players.filter(p=>!p.respawnAt&&Math.hypot(p.x-z.x,p.y-z.y)<=z.r);
-    z.contested=inside.length>1;
-    if(inside.length===1){z.owner=inside[0].id;inside[0].score+=6}
-    else if(inside.length===0)z.owner=null;
-   }
+ for(let i=0;i<r.mobs.length;i++)if(r.mobs[i].hp<=0)r.mobs[i]=spawnDrone(r,i);
+}
+function tickAsteroids(r,t,dt){
+ for(const m of r.meteors){
+  m.x+=m.vx*dt;m.y+=m.vy*dt;
+  if(m.x<m.r||m.x>W-m.r){m.x=clamp(m.x,m.r,W-m.r);m.vx*=-1}
+  if(m.y<m.r||m.y>H-m.r){m.y=clamp(m.y,m.r,H-m.r);m.vy*=-1}
+  for(const p of r.players){
+   if(p.respawnAt||t<p.invUntil||t<m.hitAt||Math.hypot(m.x-p.x,m.y-p.y)>m.r+19)continue;
+   m.hitAt=t+1100;p.invUntil=t+500;
+   if(p.shield)p.shield--;else p.hp=Math.max(0,p.hp-28);
+   effect(r,p.x,p.y,'hit');
+   if(!p.hp){p.deaths++;p.respawnAt=t+2400;effect(r,p.x,p.y,'ko')}
   }
  }
- if(r.gameId==='space'){
-  const elapsed=(t-r.startedAt)/1000;
-  r.meteorTimer-=dt;
-  if(r.meteorTimer<=0&&r.meteors.length<45){
-   r.meteorTimer=Math.max(.19,.72-elapsed*.0026);
-   const alive=r.players.filter(p=>!p.respawnAt),target=alive[Math.floor(rand(0,alive.length))];
-   if(target){
-    const x=clamp(target.x+rand(-480,480),38,W-38),y=clamp(target.y-rand(340,530),-45,H-140);
-    r.meteors.push({x,y,vx:rand(-75,75),vy:rand(330,470)+Math.min(230,elapsed*1.8),r:rand(18,34),dead:false});
-   }
-  }
-  for(const m of r.meteors){
-   m.x+=m.vx*dt;m.y+=m.vy*dt;
-   if(m.y>H+90||m.x<-80||m.x>W+80){m.dead=true;continue}
-   for(const p of r.players){
-    if(!p.respawnAt&&Math.hypot(p.x-m.x,p.y-m.y)<m.r+23){
-     m.dead=true;meteorDamage(r,p,t);effect(r,m.x,m.y,'meteor');break
-    }
-   }
-  }
-  r.meteors=r.meteors.filter(m=>!m.dead);
-  r.scoreTimer+=dt;
-  if(r.scoreTimer>=1){const secs=Math.floor(r.scoreTimer);r.scoreTimer-=secs;for(const p of r.players)if(!p.respawnAt)p.score+=secs*5}
- }
+ for(let i=0;i<r.meteors.length;i++)if(r.meteors[i].hp<=0)r.meteors[i]=spawnAsteroid();
 }
 function updateRoom(r,t,dt){
- if(r.phase==='countdown'){if(t>=r.endsAt){r.phase='playing';r.startedAt=t;r.endsAt=t+(GAMES[r.gameId]?.duration||ROUND_MS);push(r)}return}
+ if(r.phase==='countdown'){if(t>=r.endsAt){r.phase='playing';r.endsAt=t+(GAMES[r.gameId]?.duration||ROUND_MS);push(r)}return}
  if(r.phase!=='playing')return;
  if(t>=r.endsAt){endGame(r);return}
+ if(r.gameId==='fishing')return;
+ if(r.gameId==='jumping'){tickJumping(r,t,dt);return}
  for(const p of r.players){
   if(p.respawnAt){if(t>=p.respawnAt)respawn(p,t);else continue}
-  const input=t-p.lastInput>1000?{dx:0,dy:0,angle:p.angle,fire:false,dash:false}:p.input;
-  p.angle=input.angle;
+  const input=t-p.lastInput<1000?p.input:{dx:0,dy:0,angle:p.angle,fire:false,dash:false};
+  if(Number.isFinite(input.angle))p.angle=input.angle;
   let dx=clamp(input.dx,-1,1),dy=clamp(input.dy,-1,1),mag=Math.hypot(dx,dy);
   if(mag>1){dx/=mag;dy/=mag}
-  let speed=p.speedUntil>t?330:235;
-  if(input.dash&&!p.dashHeld&&p.dashAt<t&&mag>0.2){p.dashAt=t+4500;speed*=4.5;p.invUntil=Math.max(p.invUntil,t+260);effect(r,p.x,p.y,'dash')}
-  p.dashHeld=input.dash;
-  move(p,dx*speed*dt,dy*speed*dt);
-  if(input.fire&&r.gameId!=='fishing')fire(r,p,t);
+  let speed=p.speedUntil>t?330:240;
+  if(input.dash&&!p.dashHeld&&p.dashAt<t&&mag>.2){p.dashAt=t+4200;speed*=4.4;p.invUntil=Math.max(p.invUntil,t+250);effect(r,p.x,p.y,'dash')}
+  p.dashHeld=!!input.dash;
+  if(r.gameId==='space'){p.x=clamp(p.x+dx*speed*dt,24,W-24);p.y=clamp(p.y+dy*speed*dt,24,H-24)}
+  else move(p,dx*speed*dt,dy*speed*dt);
+  if(input.fire)fire(r,p,t);
  }
  for(const b of r.bullets){
-  b.prevX=b.x;b.prevY=b.y;b.x+=b.vx*dt;b.y+=b.vy*dt;
-  if(t>b.expires||!canMove(b.x,b.y,5)){b.dead=true;continue}
-  const owner=r.players.find(p=>p.id===b.owner);if(!owner){b.dead=true;continue}
-  if(r.gameId==='space'){
-   for(const m of r.meteors){if(!m.dead&&Math.hypot(m.x-b.x,m.y-b.y)<m.r+7){b.dead=true;m.dead=true;owner.score+=30;effect(r,m.x,m.y,'meteor');break}}
-   continue;
+  b.x+=b.vx*dt;b.y+=b.vy*dt;
+  if(t>b.expires||b.x<5||b.x>W-5||b.y<5||b.y>H-5||(r.gameId==='tank'&&!canMove(b.x,b.y,5))){b.dead=true;continue}
+  const shooter=r.players.find(p=>p.id===b.owner);if(!shooter){b.dead=true;continue}
+  const targets=r.gameId==='space'?r.meteors:r.mobs;
+  for(const obj of targets){
+   const radius=r.gameId==='space'?obj.r+7:32;
+   if(obj.hp>0&&Math.hypot(obj.x-b.x,obj.y-b.y)<radius){
+    obj.hp--;b.dead=true;effect(r,obj.x,obj.y,'hit');
+    if(obj.hp===0){shooter.score+=r.gameId==='space'?45:75;shooter.kills++;effect(r,obj.x,obj.y,'ko')}
+    break
+   }
   }
-  if(r.gameId==='fishing')continue;
+  if(b.dead)continue;
   for(const p of r.players){
-   if(p.id===b.owner||p.respawnAt)continue;
-   if(Math.hypot(p.x-b.x,p.y-b.y)<26){b.dead=true;hit(r,p,owner,t);break}
+   if(p.id===shooter.id||p.respawnAt)continue;
+   if(Math.hypot(p.x-b.x,p.y-b.y)<26){b.dead=true;hit(r,p,shooter,t);break}
   }
  }
  r.bullets=r.bullets.filter(b=>!b.dead);
+ if(r.gameId==='space')tickAsteroids(r,t,dt);else tickDrones(r,t,dt);
  for(const pick of r.pickups){
   if(!pick.active){if(t>=pick.respawn)pick.active=true;continue}
   for(const p of r.players){
    if(p.respawnAt||Math.hypot(p.x-pick.x,p.y-pick.y)>38)continue;
-   if(pick.type==='heal'){if(p.hp===100)continue;p.hp=Math.min(100,p.hp+45)}
+   if(pick.type==='heal'&&p.hp===100)continue;
+   if(pick.type==='heal')p.hp=Math.min(100,p.hp+45);
    if(pick.type==='shield')p.shield=Math.min(3,p.shield+2);
    if(pick.type==='speed')p.speedUntil=t+7500;
-   pick.active=false;pick.respawn=t+12000;effect(r,pick.x,pick.y,'pickup');break;
+   pick.active=false;pick.respawn=t+12000;effect(r,pick.x,pick.y,'pickup');break
   }
  }
- modeStep(r,t,dt);
  r.fx=r.fx.filter(f=>f.until>t);
 }
 let last=now();
@@ -192,7 +218,7 @@ setInterval(()=>{
  const t=now(),dt=Math.min(0.075,Math.max(0,(t-last)/1000));last=t;
  for(const r of rooms.values()){
   updateRoom(r,t,dt);
-  if(r.phase==='playing'&&r.clients.size&&t-r.lastPush>=100){push(r);r.lastPush=t}
+  if(r.phase==='playing'&&r.clients.size&&t-r.lastPush>=(r.gameId==='fishing'?500:100)){push(r);r.lastPush=t}
   if(!r.clients.size&&t-r.activeAt>3600000){for(const p of [...r.players,...r.spectators])sessions.delete(p.token);rooms.delete(r.code)}
  }
 },50);
@@ -204,6 +230,12 @@ function api(req,res,body){
   if(route==='/api/join'){const r=getRoom(b.code),name=cleanName(b.name);if(!name)fault('Enter your nickname first');if(r.players.length+r.spectators.length>=8)fault('Room full (8 players maximum)');const p=makePlayer(name,nextSlot(r));if(r.phase==='lobby')r.players.push(p);else r.spectators.push(p);sessions.set(p.token,r.code);r.activeAt=now();push(r);return json(res,200,{token:p.token,code:r.code})}
   const {r,p}=getAuth(b.token);r.activeAt=now();
   if(route==='/api/resume')return json(res,200,{ok:true});
+  if(route==='/api/fish'){
+   if(r.phase!=='playing'||r.gameId!=='fishing'||!r.players.includes(p))fault('Fishing round not active.');
+   const t=now();if(t-p.lastCatch<6000)fault('Wait before catching another fish.');
+   p.lastCatch=t;p.fishClaims++;const points=50+Math.floor(rand(0,60));
+   p.score+=points;push(r);return json(res,200,{ok:true,points,total:p.score});
+  }
   if(route==='/api/select'){
    if(r.host!==p.id)fault('Only the host can select a game');
    if(r.phase!=='lobby'&&r.phase!=='done')fault('Finish the match or return to lobby first');
@@ -215,7 +247,7 @@ function api(req,res,body){
   if(route==='/api/input'){
    if(r.phase!=='playing'||!r.players.includes(p))return json(res,200,{ok:true});
    const v=b.input||{};
-   p.input={dx:clamp(Number(v.dx)||0,-1,1),dy:clamp(Number(v.dy)||0,-1,1),angle:Number.isFinite(Number(v.angle))?Number(v.angle):p.angle,fire:v.fire===true,dash:v.dash===true};
+   p.input={dx:clamp(Number(v.dx)||0,-1,1),dy:clamp(Number(v.dy)||0,-1,1),angle:Number.isFinite(Number(v.angle))?Number(v.angle):p.angle,fire:v.fire===true,dash:v.dash===true,jump:v.jump===true};
    p.lastInput=now();return json(res,200,{ok:true});
   }
   if(route==='/api/leave'){
@@ -251,8 +283,8 @@ const server=http.createServer((req,res)=>{
   let body='';req.on('data',chunk=>{body+=chunk;if(body.length>5000)req.destroy()});
   req.on('end',()=>api(req,res,body));return;
  }
- if(req.method==='GET'&&(route==='/'||route==='/index.html')){
-  const file=path.join(__dirname,'index.html');
+ if(req.method==='GET'&&(route==='/'||route==='/index.html'||route==='/fishing.html')){
+  const file=path.join(__dirname,route==='/fishing.html'?'fishing.html':'index.html');
   fs.readFile(file,(err,data)=>{
    if(err)return json(res,404,{error:'Game client missing'});
    res.writeHead(200,{'Content-Type':mime['.html'],'Cache-Control':'no-store'});res.end(data);
