@@ -192,7 +192,7 @@ setInterval(()=>{
  const t=now(),dt=Math.min(0.075,Math.max(0,(t-last)/1000));last=t;
  for(const r of rooms.values()){
   updateRoom(r,t,dt);
-  if(r.clients.size&&t-r.lastPush>=100){push(r);r.lastPush=t}
+  if(r.phase==='playing'&&r.clients.size&&t-r.lastPush>=100){push(r);r.lastPush=t}
   if(!r.clients.size&&t-r.activeAt>3600000){for(const p of [...r.players,...r.spectators])sessions.delete(p.token);rooms.delete(r.code)}
  }
 },50);
