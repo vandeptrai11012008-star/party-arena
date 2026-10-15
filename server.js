@@ -3,10 +3,10 @@ const http=require('http'),fs=require('fs'),path=require('path'),crypto=require(
 const PORT=Number(process.env.PORT)||3000;
 const W=1800,H=1080,ROUND_MS=150000;
 const GAMES={
- rumble:{id:'rumble',name:'Neon Rumble',duration:150000,objective:'Outplay rivals in a neon battle arena.'},
- crystals:{id:'crystals',name:'Crystal Rush',duration:105000,objective:'Collect glowing crystals. No combat: speed and routes win.'},
- zones:{id:'zones',name:'Zone Control',duration:120000,objective:'Control capture points to score. Contest the zones to stop rivals.'},
- meteors:{id:'meteors',name:'Meteor Dodge',duration:105000,objective:'Dodge meteor showers and earn survival points. Blast meteors for bonuses.'}
+ tank:{id:'tank',name:'Tank Survival',duration:150000,objective:'Drive your tank, shoot drones and survive in the arena.'},
+ fishing:{id:'fishing',name:'Fishing 3D',duration:120000,objective:'Catch fish from a boat in first person, using the original 3D lake.'},
+ jumping:{id:'jumping',name:'Skybound Jumping',duration:120000,objective:'Jump across floating platforms and gather stars.'},
+ space:{id:'space',name:'Space Evolution',duration:150000,objective:'Pilot a spaceship and shoot asteroids across the galaxy.'}
 };
 const rooms=new Map(),sessions=new Map();
 const now=()=>Date.now(),rand=(a,b)=>a+Math.random()*(b-a),clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -36,9 +36,9 @@ function stateFor(r,token){
  serverNow:now(),endsAt:r.endsAt,round:r.round,gameId:r.gameId,practice:r.practice,games:Object.values(GAMES),players:r.players.map(playerView),spectators:r.spectators.map(x=>({id:x.id,name:x.name})),
  bullets:r.phase==='playing'?r.bullets.map(b=>({x:Math.round(b.x),y:Math.round(b.y),vx:b.vx,vy:b.vy,owner:b.owner})):[],
  pickups:r.phase==='playing'?r.pickups.filter(x=>x.active).map(x=>({x:x.x,y:x.y,type:x.type})):[],
- gems:r.gameId==='crystals'&&r.phase==='playing'?r.gems.filter(g=>g.active).map(g=>({x:Math.round(g.x),y:Math.round(g.y),rare:g.rare})):[],
- zones:r.gameId==='zones'?r.zones.map(z=>({x:z.x,y:z.y,r:z.r,owner:z.owner,contested:z.contested})):[],
- meteors:r.gameId==='meteors'&&r.phase==='playing'?r.meteors.map(m=>({x:Math.round(m.x),y:Math.round(m.y),r:m.r})):[],
+ gems:r.gameId==='fishing'&&r.phase==='playing'?r.gems.filter(g=>g.active).map(g=>({x:Math.round(g.x),y:Math.round(g.y),rare:g.rare})):[],
+ zones:r.gameId==='jumping'?r.zones.map(z=>({x:z.x,y:z.y,r:z.r,owner:z.owner,contested:z.contested})):[],
+ meteors:r.gameId==='space'&&r.phase==='playing'?r.meteors.map(m=>({x:Math.round(m.x),y:Math.round(m.y),r:m.r})):[],
  fx:r.phase==='playing'?r.fx.map(f=>({x:f.x,y:f.y,type:f.type,id:f.id})):[],
  champion:r.champion,arena:{w:W,h:H,obstacles:OBS}
  };
@@ -49,7 +49,7 @@ function push(r){
   catch{r.clients.delete(token)}
  }
 }
-function createRoom(name){let code;do{code=newCode()}while(rooms.has(code));const p=makePlayer(name,0),r={code,players:[p],spectators:[],host:p.id,clients:new Map(),phase:'lobby',round:0,gameId:'rumble',practice:false,endsAt:0,bullets:[],pickups:[],gems:[],zones:[],meteors:[],meteorTimer:0,scoreTimer:0,fx:[],champion:'',lastTick:now(),lastPush:0,activeAt:now()};rooms.set(code,r);sessions.set(p.token,code);return {r,p}}
+function createRoom(name){let code;do{code=newCode()}while(rooms.has(code));const p=makePlayer(name,0),r={code,players:[p],spectators:[],host:p.id,clients:new Map(),phase:'lobby',round:0,gameId:'tank',practice:false,endsAt:0,bullets:[],pickups:[],gems:[],zones:[],meteors:[],meteorTimer:0,scoreTimer:0,fx:[],champion:'',lastTick:now(),lastPush:0,activeAt:now()};rooms.set(code,r);sessions.set(p.token,code);return {r,p}}
 function nextSlot(r){const slots=new Set([...r.players,...r.spectators].map(p=>p.slot));for(let i=0;i<8;i++)if(!slots.has(i))return i;return 0}
 function toLobby(r){r.phase='lobby';r.practice=false;r.round=0;r.endsAt=0;r.champion='';r.bullets=[];r.pickups=[];r.gems=[];r.zones=[];r.meteors=[];r.meteorTimer=0;r.scoreTimer=0;r.fx=[];r.players.push(...r.spectators.splice(0,8-r.players.length));for(const p of r.players)resetPlayer(p);push(r)}
 function start(r,practice=false){if(r.players.length<2&&!practice)fault('At least 2 players are required to start, or choose Solo Practice.');
@@ -57,9 +57,9 @@ function start(r,practice=false){if(r.players.length<2&&!practice)fault('At leas
  r.players.push(...r.spectators.splice(0,8-r.players.length));
  for(const p of r.players)resetPlayer(p);
  r.practice=practice&&r.players.length===1;r.round++;r.phase='countdown';r.endsAt=now()+4000;r.bullets=[];r.fx=[];r.champion='';r.gems=[];r.zones=[];r.meteors=[];r.meteorTimer=0;r.scoreTimer=0;
- r.pickups=r.gameId==='crystals'?[]:PICKSPOTS.map((a,i)=>({x:a[0],y:a[1],type:['heal','shield','speed'][i%3],active:true,respawn:0}));
- if(r.gameId==='crystals')for(let i=0;i<34;i++)r.gems.push(newGem(i));
- if(r.gameId==='zones')r.zones=[{x:425,y:555,r:135,owner:null,contested:false},{x:905,y:295,r:135,owner:null,contested:false},{x:1375,y:555,r:135,owner:null,contested:false}];
+ r.pickups=r.gameId==='fishing'?[]:PICKSPOTS.map((a,i)=>({x:a[0],y:a[1],type:['heal','shield','speed'][i%3],active:true,respawn:0}));
+ if(r.gameId==='fishing')for(let i=0;i<34;i++)r.gems.push(newGem(i));
+ if(r.gameId==='jumping')r.zones=[{x:425,y:555,r:135,owner:null,contested:false},{x:905,y:295,r:135,owner:null,contested:false},{x:1375,y:555,r:135,owner:null,contested:false}];
  r.startedAt=0;
  push(r);
 }
@@ -71,7 +71,7 @@ function newGem(i){
 function canMove(x,y,r=22){return x>=r&&x<=W-r&&y>=r&&y<=H-r&&!OBS.some(o=>x+r>o.x&&x-r<o.x+o.w&&y+r>o.y&&y-r<o.y+o.h)}
 function move(p,dx,dy){let nx=clamp(p.x+dx,23,W-23),ny=clamp(p.y+dy,23,H-23);if(canMove(nx,p.y))p.x=nx;if(canMove(p.x,ny))p.y=ny}
 function fire(r,p,t){
- if(t<p.fireAt||p.respawnAt||r.gameId==='crystals')return;
+ if(t<p.fireAt||p.respawnAt||r.gameId==='fishing')return;
  p.fireAt=t+240;
  const a=p.angle,speed=710;const x=p.x+Math.cos(a)*31,y=p.y+Math.sin(a)*31;
  r.bullets.push({x,y,prevX:x,prevY:y,vx:Math.cos(a)*speed,vy:Math.sin(a)*speed,owner:p.id,expires:t+1150});
@@ -83,8 +83,8 @@ function hit(r,p,shooter,t){
  if(p.respawnAt||p.invUntil>t)return;
  if(p.shield>0){p.shield--;effect(r,p.x,p.y,'shield');return}
  p.hp=Math.max(0,p.hp-25);effect(r,p.x,p.y,'hit');
- if(p.hp===0){p.deaths++;p.respawnAt=t+2600;p.input.fire=false;shooter.score+=r.gameId==='zones'?25:100;shooter.kills++;effect(r,p.x,p.y,'ko')}
- else shooter.score+=r.gameId==='zones'?3:10;
+ if(p.hp===0){p.deaths++;p.respawnAt=t+2600;p.input.fire=false;shooter.score+=r.gameId==='jumping'?25:100;shooter.kills++;effect(r,p.x,p.y,'ko')}
+ else shooter.score+=r.gameId==='jumping'?3:10;
 }
 function endGame(r){r.phase='done';r.endsAt=0;const sorted=[...r.players].sort((a,b)=>b.score-a.score||a.deaths-b.deaths);const highest=sorted[0]?.score??0;r.champion=sorted.filter(p=>p.score===highest).map(p=>p.name).join(' & ');r.bullets=[];push(r)}
 function meteorDamage(r,p,t){
@@ -94,7 +94,7 @@ function meteorDamage(r,p,t){
  if(p.hp<=0){p.deaths++;p.respawnAt=t+2300;p.input.fire=false;effect(r,p.x,p.y,'ko')}
 }
 function modeStep(r,t,dt){
- if(r.gameId==='crystals'){
+ if(r.gameId==='fishing'){
   for(const g of r.gems){
    if(!g.active){if(t>=g.respawn){const n=newGem(Math.floor(rand(0,40)));g.x=n.x;g.y=n.y;g.active=true}continue}
    for(const p of r.players){
@@ -106,7 +106,7 @@ function modeStep(r,t,dt){
    }
   }
  }
- if(r.gameId==='zones'){
+ if(r.gameId==='jumping'){
   r.scoreTimer+=dt;
   if(r.scoreTimer>=.5){
    r.scoreTimer%=.5;
@@ -118,7 +118,7 @@ function modeStep(r,t,dt){
    }
   }
  }
- if(r.gameId==='meteors'){
+ if(r.gameId==='space'){
   const elapsed=(t-r.startedAt)/1000;
   r.meteorTimer-=dt;
   if(r.meteorTimer<=0&&r.meteors.length<45){
@@ -157,17 +157,17 @@ function updateRoom(r,t,dt){
   if(input.dash&&!p.dashHeld&&p.dashAt<t&&mag>0.2){p.dashAt=t+4500;speed*=4.5;p.invUntil=Math.max(p.invUntil,t+260);effect(r,p.x,p.y,'dash')}
   p.dashHeld=input.dash;
   move(p,dx*speed*dt,dy*speed*dt);
-  if(input.fire&&r.gameId!=='crystals')fire(r,p,t);
+  if(input.fire&&r.gameId!=='fishing')fire(r,p,t);
  }
  for(const b of r.bullets){
   b.prevX=b.x;b.prevY=b.y;b.x+=b.vx*dt;b.y+=b.vy*dt;
   if(t>b.expires||!canMove(b.x,b.y,5)){b.dead=true;continue}
   const owner=r.players.find(p=>p.id===b.owner);if(!owner){b.dead=true;continue}
-  if(r.gameId==='meteors'){
+  if(r.gameId==='space'){
    for(const m of r.meteors){if(!m.dead&&Math.hypot(m.x-b.x,m.y-b.y)<m.r+7){b.dead=true;m.dead=true;owner.score+=30;effect(r,m.x,m.y,'meteor');break}}
    continue;
   }
-  if(r.gameId==='crystals')continue;
+  if(r.gameId==='fishing')continue;
   for(const p of r.players){
    if(p.id===b.owner||p.respawnAt)continue;
    if(Math.hypot(p.x-b.x,p.y-b.y)<26){b.dead=true;hit(r,p,owner,t);break}
