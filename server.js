@@ -46,5 +46,22 @@ const mime={'.html':'text/html','.css':'text/css','.js':'text/javascript','.svg'
 const server=http.createServer((req,res)=>{const pathname=new URL(req.url,'http://localhost').pathname;
  if(req.method==='GET'&&pathname==='/events'){const token=new URL(req.url,'http://localhost').searchParams.get('token'),c=sessions.get(token);if(!c||!rooms.has(c))return response(res,401,{error:'Invalid session'});const r=rooms.get(c);res.writeHead(200,{'Content-Type':'text/event-stream','Cache-Control':'no-cache, no-transform','Connection':'keep-alive'});r.clients.set(token,res);const p=r.players.concat(r.spectators).find(x=>x.token===token);if(p)p.online=true;res.write('data: '+JSON.stringify(publicState(r,token))+'\n\n');const heartbeat=setInterval(()=>{try{res.write(': ping\n\n')}catch{}},15000);req.on('close',()=>{clearInterval(heartbeat);r.clients.delete(token);if(p){p.online=false;if(r.host===p.id){const other=r.players.find(x=>x.online);if(other)r.host=other.id}push(r)}});return}
  if(req.method==='POST'&&pathname.startsWith('/api/')){let body='';req.on('data',chunk=>{body+=chunk;if(body.length>10000)req.destroy()});req.on('end',()=>api(req,res,body));return}
- if(req.method==='GET'){const file=path.join(__dirname,'public',pathname==='/'?'index.html':pathname);if(!file.startsWith(path.join(__dirname,'public')))return response(res,403,{error:'Forbidden'});fs.readFile(file,(err,data)=>{if(err)return response(res,404,{error:'Not found'});res.writeHead(200,{'Content-Type':mime[path.extname(file)]||'application/octet-stream'});res.end(data)});return}response(res,405,{error:'Method not allowed'})});
+ if(req.method==='GET'){
+  // The game works with index.html in either /public or the repository root.
+  const relative=pathname==='/'?'index.html':pathname.replace(/^\/+/, '');
+  const normalized=path.normalize(relative);
+  if(path.isAbsolute(normalized)||normalized==='..'||normalized.startsWith('..'+path.sep))return response(res,403,{error:'Forbidden'});
+  const candidates=[path.join(__dirname,'public',normalized)];
+  if(normalized==='index.html')candidates.push(path.join(__dirname,'index.html'));
+  const serve=(n)=>{
+   if(n>=candidates.length)return response(res,404,{error:'Not found'});
+   const file=candidates[n];
+   fs.readFile(file,(err,data)=>{
+    if(err)return serve(n+1);
+    res.writeHead(200,{'Content-Type':mime[path.extname(file)]||'application/octet-stream','Cache-Control':normalized==='index.html'?'no-cache':'public, max-age=60'});
+    res.end(data);
+   });
+  };
+  serve(0);return;
+ }response(res,405,{error:'Method not allowed'})});
 server.listen(PORT,'0.0.0.0',()=>console.log(`Party Arena running at http://localhost:${PORT}`));
