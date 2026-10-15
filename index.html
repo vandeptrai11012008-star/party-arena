@@ -93,7 +93,26 @@ async function leave(){try{await api('leave',{token})}catch(e){}closeSession()}
 function copy(){const text=location.origin+'  — ROOM: '+s.code; if(navigator.clipboard?.writeText)navigator.clipboard.writeText(text).then(()=>alertText('Invite copied!'),()=>alertText('Code: '+s.code));else alertText('Code: '+s.code)}
 $('name').value=localStorage.getItem('neonName')||'';$('create').onclick=create;$('join').onclick=join;$('start').onclick=start;$('practice').onclick=practice;$('backLobby').onclick=back;$('mobileLobby').onclick=back;$('exitGame').onclick=leave;$('leave').onclick=leave;$('copy').onclick=copy;
 function soundEffect(type){try{audio=audio||new(window.AudioContext||window.webkitAudioContext)();let o=audio.createOscillator(),v=audio.createGain();o.type='sawtooth';o.frequency.value=type==='ko'?130:320;v.gain.value=.018;o.connect(v);v.connect(audio.destination);o.start();v.gain.exponentialRampToValueAtTime(.001,audio.currentTime+.11);o.stop(audio.currentTime+.12)}catch(e){}}
-$('sound').onclick=()=>{soundOn=!soundOn;$('sound').textContent=soundOn?'♫ SOUND ON':'♪ SOUND OFF';if(soundOn)soundEffect('hit')};
+$('sound').onclick=()=>{
+ soundOn=!soundOn;
+ $('sound').textContent=soundOn?'♫ MUSIC ON':'♪ MUSIC OFF';
+ if(soundOn)soundEffect('hit')
+};
+let tuneStep=0;
+setInterval(()=>{
+ if(!soundOn||view!=='game'||!s||s.phase!=='playing')return;
+ try{
+  audio=audio||new(window.AudioContext||window.webkitAudioContext)();
+  const base=({tank:146.83,fishing:174.61,jumping:196.00,space:130.81})[s.gameId]||146.83;
+  const notes=[1,1.25,1.5,2,1.5,1.25,1.12,1.33];
+  const osc=audio.createOscillator(),gain=audio.createGain(),at=audio.currentTime;
+  osc.type='sine';osc.frequency.value=base*notes[tuneStep++%notes.length];
+  gain.gain.setValueAtTime(.001,at);
+  gain.gain.linearRampToValueAtTime(.009,at+.045);
+  gain.gain.exponentialRampToValueAtTime(.001,at+.37);
+  osc.connect(gain);gain.connect(audio.destination);osc.start(at);osc.stop(at+.39);
+ }catch(e){}
+},490);
 function resize(){let b=c.getBoundingClientRect();if(!b.width||!b.height)return;screen.w=b.width;screen.h=b.height;screen.dpr=Math.min(1.4,window.devicePixelRatio||1);c.width=Math.round(b.width*screen.dpr);c.height=Math.round(b.height*screen.dpr);mini.width=284;mini.height=184}
 window.addEventListener('resize',resize);
 document.addEventListener('keydown',e=>{let k=e.key.toLowerCase();if(['w','a','s','d',' ','shift','e','arrowup','arrowdown','arrowleft','arrowright'].includes(k)){if(view==='game')e.preventDefault();key[k]=true}});
