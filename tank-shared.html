@@ -59,6 +59,7 @@ let view={x:0,y:0,scale:1},size={w:0,h:0,dpr:1},lastInput=0,serverOffset=0;
 const lowPower=!!(window.matchMedia?.('(pointer: coarse)')?.matches)||window.innerWidth<640;
 let cachedObstacles=null,lastPaintAt=0,lastMinimapAt=0,blend=.24,terrainGradient=null;
 let lastSentInput=null,lastInputEmit=0,sessionToken='',inputBusy=false,latestQueuedInput=null,estimatedRtt=130;
+let predictedLocal=null,localDrawPose=null,snapshotLocalAt=0;
 const frameInterval=lowPower?23:13; // aim for 30-45 FPS on touch, up to 60 FPS on desktop
 function visible(x,y,pad=60){
  return x>=view.x-pad&&y>=view.y-pad&&x<=view.x+size.w/view.scale+pad&&y<=view.y+size.h/view.scale+pad;
@@ -83,7 +84,7 @@ addEventListener('message',e=>{
   else if(cachedObstacles)incoming.tank.obstacles=cachedObstacles;
   else{sendParent({type:'party-tank-ready'});return} // request missing initial map
  }
- state=incoming;ownId=state.me;latestStateAt=Date.now();
+ state=incoming;ownId=state.me;latestStateAt=Date.now();snapshotLocalAt=performance.now();
  serverOffset=Date.now()-(state.serverNow||Date.now());
  $('warning').style.display='none';wasReady=true;
  const player=mine();if(player){
@@ -103,7 +104,64 @@ addEventListener('message',e=>{
 sendParent({type:'party-tank-ready'});
 setInterval(()=>{if(!wasReady)sendParent({type:'party-tank-ready'})},1400);
 function mine(){return state?.players?.find(p=>p.id===ownId)||null}
+// Immediate local driving prediction: movement responds to the player's
+// keyboard/joystick on the next rendered frame, instead of waiting for a
+// round trip to Render. Server snapshots gently correct visual drift.
+function localBlocked(x,y,world,p){
+ if(x<46||y<46||x>world.w-46||y>world.h-46)return true;
+ for(const o of world.obstacles||[])
+  if(x+26>o.x&&x-26<o.x+o.w&&y+26>o.y&&y-26<o.y+o.h)return true;
+ for(const q of state.players){
+  if(q.id!==p.id&&!q.respawnAt&&Math.hypot(q.x-x,q.y-y)<49)return true;
+ }
+ for(const mob of world.mobs){
+  if(mob.hp>0&&Math.hypot(mob.x-x,mob.y-y)<47)return true;
+ }
+ return false;
+}
+function predictOwn(p,dt,world){
+ const t=Date.now()-serverOffset;
+ if(p.respawnAt&&p.respawnAt>t){predictedLocal=null;return {x:p.x,y:p.y,a:p.a,bodyA:p.bodyA}}
+ if(!predictedLocal||Math.hypot(predictedLocal.x-p.x,predictedLocal.y-p.y)>240){
+  predictedLocal={x:p.x,y:p.y,a:p.a||0,bodyA:p.bodyA||0,dashUntil:0,dashHeld:false};
+ }
+ const cmd=makeInput();
+ let dx=trim(Number(cmd.dx)||0,-1,1),dy=trim(Number(cmd.dy)||0,-1,1);
+ const mag=Math.hypot(dx,dy);
+ if(mag>1){dx/=mag;dy/=mag}
+ if(cmd.dash&&!predictedLocal.dashHeld&&mag>.1&&p.dashAt<=t){
+  predictedLocal.dashUntil=performance.now()+260;
+ }
+ predictedLocal.dashHeld=!!cmd.dash;
+ let speed=p.speedUntil>t?285:205;
+ if(performance.now()<predictedLocal.dashUntil)speed*=2.6;
+ if(mag>.06){
+  predictedLocal.bodyA=Math.atan2(dy,dx);
+  const nx=predictedLocal.x+dx*speed*dt,ny=predictedLocal.y+dy*speed*dt;
+  if(!localBlocked(nx,predictedLocal.y,world,p))predictedLocal.x=nx;
+  if(!localBlocked(predictedLocal.x,ny,world,p))predictedLocal.y=ny;
+ }
+ // Reconcile with the server's authoritative position while compensating
+ // for the travel time of commands and incoming snapshots.
+ const snapshotAge=trim((performance.now()-snapshotLocalAt)/1000,0,.18);
+ const networkLead=trim(.035+estimatedRtt*.0006+snapshotAge,0,.28);
+ const sx=p.x+dx*speed*networkLead,sy=p.y+dy*speed*networkLead;
+ const error=Math.hypot(predictedLocal.x-sx,predictedLocal.y-sy);
+ if(error>220){
+  // Death / teleport / hard collision: never keep a stale prediction.
+  predictedLocal.x=p.x;predictedLocal.y=p.y;predictedLocal.dashUntil=0;
+ }else if(error>.75){
+  const strength=1-Math.exp(-dt*(error>65?8:3.2));
+  const nx=predictedLocal.x+(sx-predictedLocal.x)*strength;
+  const ny=predictedLocal.y+(sy-predictedLocal.y)*strength;
+  if(!localBlocked(nx,predictedLocal.y,world,p))predictedLocal.x=nx;
+  if(!localBlocked(predictedLocal.x,ny,world,p))predictedLocal.y=ny;
+ }
+ predictedLocal.a=Number.isFinite(cmd.angle)?cmd.angle:p.a||0;
+ return predictedLocal;
+}
 function smoothPosition(p){
+ if(p.id===ownId&&localDrawPose)return localDrawPose;
  let val=smooth.get(p.id);
  if(!val){val={x:p.x,y:p.y,a:p.a||0,bodyA:p.bodyA||0};smooth.set(p.id,val)}
  val.x+=(p.x-val.x)*blend;val.y+=(p.y-val.y)*blend;
@@ -117,7 +175,8 @@ function toWorld(clientX,clientY){
 function updateAim(e){
  const p=mine();if(!p)return;
  const pos=toWorld(e.clientX,e.clientY);
- aimAngle=Math.atan2(pos.y-p.y,pos.x-p.x);
+ const origin=localDrawPose||p;
+ aimAngle=Math.atan2(pos.y-origin.y,pos.x-origin.x);
 }
 const gameKeys=new Set(['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright',' ','shift','e']);
 addEventListener('keydown',e=>{const k=e.key.toLowerCase();if(gameKeys.has(k)){e.preventDefault();keys[k]=true}});
@@ -273,8 +332,8 @@ function tank(x,y,hullAngle,turretAngle,col,kind,time){
  g.restore();
 }
 function drawPlayer(p,time,me){
- if(!visible(p.x,p.y,105)){smooth.set(p.id,{x:p.x,y:p.y,a:p.a||0,bodyA:p.bodyA||0});return}
  const pos=smoothPosition(p);
+ if(!visible(pos.x,pos.y,105)){if(p.id!==ownId)smooth.set(p.id,{x:p.x,y:p.y,a:p.a||0,bodyA:p.bodyA||0});return}
  const dead=p.respawnAt>Date.now()-serverOffset;
  if(dead)return;
  if(p.id===me) {
@@ -355,6 +414,7 @@ function draw(timestamp){
  const world=state.tank;
  const target=mine()||state.players[0];
  if(!target)return;
+ localDrawPose=target.id===ownId&&!state.isSpectator?predictOwn(target,dt,world):null;
  const pos=smoothPosition(target);
  const wanted=Math.max(.52,Math.min(1.05,Math.min(size.w/1020,size.h/630)));
  view.scale=wanted;
