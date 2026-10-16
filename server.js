@@ -1,6 +1,7 @@
 'use strict';
 const http=require('http'),fs=require('fs'),path=require('path'),crypto=require('crypto');
 const PORT=Number(process.env.PORT)||3000;
+const tankWorld=require('./tank-world');
 const W=1800,H=1080,ROUND_MS=150000;
 const GAMES={
  tank:{id:'tank',name:'Tank Survival',duration:150000,objective:'Original Explore & Earn Tank Survival HTML arena and local upgrades.'},
@@ -42,7 +43,7 @@ function stateFor(r,token){
  platforms:r.gameId==='jumping'?PLATFORMS:[],
  asteroids:r.gameId==='space'&&r.phase==='playing'?r.meteors.map(m=>({x:Math.round(m.x),y:Math.round(m.y),r:m.r,hp:m.hp})):[],mobs:r.gameId==='tank'&&r.phase==='playing'?r.mobs.map(m=>({x:Math.round(m.x),y:Math.round(m.y),hp:m.hp,maxHp:m.maxHp,kind:m.kind,a:m.a})):[],
  fx:r.phase==='playing'?r.fx.map(f=>({x:f.x,y:f.y,type:f.type,id:f.id})):[],
- champion:r.champion,arena:{w:W,h:H,obstacles:r.gameId==='tank'?r.obstacles:[]}
+ champion:r.champion,tank:r.gameId==='tank'&&r.phase!=='lobby'?tankWorld.view(r):null,arena:{w:W,h:H,obstacles:r.gameId==='tank'?r.obstacles:[]}
  };
 }
 function push(r){
@@ -51,9 +52,9 @@ function push(r){
   catch{r.clients.delete(token)}
  }
 }
-function createRoom(name){let code;do{code=newCode()}while(rooms.has(code));const p=makePlayer(name,0),r={code,players:[p],spectators:[],host:p.id,clients:new Map(),phase:'lobby',round:0,gameId:'tank',practice:false,endsAt:0,bullets:[],enemyBullets:[],obstacles:[],wave:1,mobSpawnAt:0,startedAt:0,pickups:[],gems:[],zones:[],meteors:[],mobs:[],meteorTimer:0,scoreTimer:0,fx:[],champion:'',lastTick:now(),lastPush:0,activeAt:now()};rooms.set(code,r);sessions.set(p.token,code);return {r,p}}
+function createRoom(name){let code;do{code=newCode()}while(rooms.has(code));const p=makePlayer(name,0),r={code,players:[p],spectators:[],host:p.id,clients:new Map(),phase:'lobby',round:0,gameId:'tank',practice:false,endsAt:0,bullets:[],enemyBullets:[],obstacles:[],wave:1,mobSpawnAt:0,startedAt:0,tank:null,pickups:[],gems:[],zones:[],meteors:[],mobs:[],meteorTimer:0,scoreTimer:0,fx:[],champion:'',lastTick:now(),lastPush:0,activeAt:now()};rooms.set(code,r);sessions.set(p.token,code);return {r,p}}
 function nextSlot(r){const slots=new Set([...r.players,...r.spectators].map(p=>p.slot));for(let i=0;i<8;i++)if(!slots.has(i))return i;return 0}
-function toLobby(r){r.phase='lobby';r.practice=false;r.round=0;r.endsAt=0;r.champion='';r.bullets=[];r.enemyBullets=[];r.obstacles=[];r.wave=1;r.mobSpawnAt=0;r.pickups=[];r.gems=[];r.zones=[];r.meteors=[];r.mobs=[];r.meteorTimer=0;r.scoreTimer=0;r.fx=[];r.players.push(...r.spectators.splice(0,8-r.players.length));for(const p of r.players)resetPlayer(p);push(r)}
+function toLobby(r){r.tank=null;r.phase='lobby';r.practice=false;r.round=0;r.endsAt=0;r.champion='';r.bullets=[];r.enemyBullets=[];r.obstacles=[];r.wave=1;r.mobSpawnAt=0;r.pickups=[];r.gems=[];r.zones=[];r.meteors=[];r.mobs=[];r.meteorTimer=0;r.scoreTimer=0;r.fx=[];r.players.push(...r.spectators.splice(0,8-r.players.length));for(const p of r.players)resetPlayer(p);push(r)}
 const PLATFORMS=[
  {x:0,y:945,w:255,h:135},{x:340,y:860,w:185,h:25},{x:615,y:780,w:195,h:25},
  {x:892,y:875,w:180,h:25},{x:1165,y:795,w:180,h:25},{x:1430,y:865,w:180,h:25},
@@ -80,14 +81,14 @@ function start(r,practice=false){
  for(const p of r.players)resetPlayer(p);
  r.practice=!!practice&&r.players.length===1;r.round++;r.phase='countdown';r.endsAt=now()+4000;
  r.bullets=[];r.enemyBullets=[];r.fx=[];r.champion='';r.gems=[];r.zones=[];r.meteors=[];r.mobs=[];
- r.obstacles=r.gameId==='tank'?OBS.map(o=>({...o})):[];r.wave=1;r.mobSpawnAt=0;r.startedAt=0;
+ r.obstacles=[];r.wave=1;r.mobSpawnAt=0;r.startedAt=0;
  r.pickups=(r.gameId==='tank'||r.gameId==='space')?PICKSPOTS.map((a,i)=>({x:a[0],y:a[1],type:['heal','shield','speed'][i%3],active:true,respawn:0})):[];
  if(r.gameId==='jumping'){
   for(const p of r.players){p.x=75+p.slot*17;p.y=922;p.vy=0;p.grounded=true}
   r.gems=PLATFORMS.slice(1).map((pl,i)=>({x:pl.x+pl.w/2,y:pl.y-52,active:true,respawn:0}))
  }
  if(r.gameId==='space')for(let i=0;i<18;i++)r.meteors.push(spawnAsteroid());
- if(r.gameId==='tank')for(let i=0;i<4;i++)r.mobs.push(spawnDrone(r,i));
+ if(r.gameId==='tank')tankWorld.create(r);
  push(r)
 }
 function newGem(i){
@@ -219,7 +220,8 @@ function updateRoom(r,t,dt){
  if(t>=r.endsAt){endGame(r);return}
  // Source-faithful HTML engines run inside each player's browser.
  // The server controls the common match clock and leaderboard.
- if(['tank','fishing','jumping','space'].includes(r.gameId))return;
+ if(r.gameId==='tank'){tankWorld.tick(r,t,dt);return}
+ if(['fishing','jumping','space'].includes(r.gameId))return;
  if(r.gameId==='jumping'){tickJumping(r,t,dt);return}
  for(const p of r.players){
   if(p.respawnAt){if(t>=p.respawnAt)respawn(p,t);else continue}
@@ -291,7 +293,7 @@ setInterval(()=>{
  const t=now(),dt=Math.min(0.075,Math.max(0,(t-last)/1000));last=t;
  for(const r of rooms.values()){
   updateRoom(r,t,dt);
-  if(r.phase==='playing'&&r.clients.size&&t-r.lastPush>=400){push(r);r.lastPush=t}
+  if(r.phase==='playing'&&r.clients.size&&t-r.lastPush>=(r.gameId==='tank'?100:400)){push(r);r.lastPush=t}
   if(!r.clients.size&&t-r.activeAt>3600000){for(const p of [...r.players,...r.spectators])sessions.delete(p.token);rooms.delete(r.code)}
  }
 },50);
@@ -304,7 +306,7 @@ function api(req,res,body){
   const {r,p}=getAuth(b.token);r.activeAt=now();
   if(route==='/api/resume')return json(res,200,{ok:true});
   if(route==='/api/classic-score'){
-   if(r.phase!=='playing'||r.gameId==='fishing'||!['tank','jumping','space'].includes(r.gameId)||!r.players.includes(p))
+   if(r.phase!=='playing'||r.gameId==='fishing'||!['jumping','space'].includes(r.gameId)||!r.players.includes(p))
     fault('No classic HTML score submission available.');
    const value=Number(b.points);
    if(!Number.isFinite(value)||value<0)fault('Invalid score');
@@ -371,8 +373,8 @@ const server=http.createServer((req,res)=>{
   let body='';req.on('data',chunk=>{body+=chunk;if(body.length>5000)req.destroy()});
   req.on('end',()=>api(req,res,body));return;
  }
- if(req.method==='GET'&&(route==='/'||route==='/index.html'||route==='/fishing.html'||route==='/classic.html')){
-  const file=path.join(__dirname,route==='/fishing.html'?'fishing.html':route==='/classic.html'?'classic.html':'index.html');
+ if(req.method==='GET'&&(route==='/'||route==='/index.html'||route==='/fishing.html'||route==='/classic.html'||route==='/tank-shared.html')){
+  const file=path.join(__dirname,route==='/fishing.html'?'fishing.html':route==='/classic.html'?'classic.html':route==='/tank-shared.html'?'tank-shared.html':'index.html');
   fs.readFile(file,(err,data)=>{
    if(err)return json(res,404,{error:'Game client missing'});
    res.writeHead(200,{'Content-Type':mime['.html'],'Cache-Control':'no-store'});res.end(data);
