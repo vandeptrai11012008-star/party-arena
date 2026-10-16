@@ -1,40 +1,44 @@
-# Party Arena — Four Worlds (2–8 Players)
+# Party Arena — Original HTML Worlds
 
-Four playable minigames, selected by the room host from a shared lobby:
+Party Arena offers **four games with their original HTML interfaces**, one lobby, 2–8 room members, and a shared live score table.
 
-1. **Tank Survival (2D):** Original-style tracked tanks based on the Explore & Earn v21 HTML model. Drive, aim the rotating cannon, shoot scout/standard/heavy enemy tanks, dodge red shells, use repair/speed/shield pickups, destroy crates/barrels, and ricochet shells off steel. Enemy waves increase every 30 seconds (up to wave 5). The whole battle can be played in fullscreen (F key).
-2. **Fishing 3D (first person):** The first-person WebGL lake experience from the original fishing prototype. Aim, cast, wait for a bite and reel using Space while managing line tension. Each successful catch awards room points. Everyone fishes in their own first-person lake view with a shared scoreboard, not a synchronized 3D world.
-3. **Skybound Jumping (2D):** Jump across platforms, collect stars and reach the finish flag for lap points. A/D and Space (or mobile move and JUMP).
-4. **Space Evolution (2D):** Fly around a star field, avoid asteroids, collect boosts and shoot asteroids for points.
+## Original sources preserved
 
-## Live page
+- **Tank Survival:** uses the Tank Survival engine and visual layout directly from the user-provided `Explore_and_Earn_Space_Evolution_Fixed_v21(2).html`.
+- **Skybound Trials (Jumping):** uses the original v21 platforms, controls, progression and visual scene.
+- **Nebula Endless (Space):** uses the original v21 space world, HUD, bosses and exploration.
+- **Fishing 3D:** uses the original first-person WebGL fishing HTML prototype supplied in this project, shown as a separate full-page game.
 
-Render URL previously configured: https://party-arena-2.onrender.com/ (verify service URL and latest deployment in the Render dashboard).
+Unlike earlier rough Canvas recreations, Tank / Jumping / Space open the source HTML in `classic.html?partyMode=tank|jumping|space`; Fishing opens `fishing.html`. The parent `index.html` keeps a compact header with the room code, timer, current scores and buttons to return to lobby or exit.
 
-## How to play
+## Multiplayer scope and limitations
 
-- Host creates a private room with a six-character code.
-- Other friends join from their own browsers (up to 8 players).
-- Host selects one of the four games from the **CHOOSE YOUR WORLD** cards.
-- With two or more players, press **START MATCH**. To test alone, press **TEST SOLO**.
-- Match length varies with mode (120–150 seconds). Host can replay or go back to lobby.
-- Scoreboard and game rules are synchronized by the server. Fishing uses a first-person local simulation and reports catches to the room server with a minimum 6-second claim cooldown.
-- Sound is opt-in: press **MUSIC ON** for a low-volume, original procedural synth loop. No licensed music is included.
+Each person controls **their own instance of the original HTML game**. The shared room provides real-time score competition and a synchronized match timer, **not a synchronized game world** in which players' tanks/ships/characters see or interact with one another. This is a deliberate trade-off to retain the original interfaces and mechanics without rewriting each game engine. Local scores are browser-reported and rate-capped; they are **not tamper-proof competitive rankings**.
 
-## Development
+Fishing catches are reported to the room for points. The original local unlocks, shop, progress and personal records remain local to that browser; they do not synchronize among players.
 
-Pure Node.js server (no npm dependencies):
+## Playing online
 
-```bash
-node server.js
-```
+1. On the homepage, enter a name and create a room.
+2. Friends enter the same website and join using the six-character room code.
+3. Host selects **Tank**, **Fishing 3D**, **Jumping** or **Space** in the lobby.
+4. With at least two people, choose **START MATCH**, or choose **TEST SOLO** to practice alone.
+5. The selected original HTML interface opens automatically after the countdown. The shared room header includes the score, remaining time and **LOBBY** (host-only). **EXIT** leaves the room.
+6. The match ends after 120–150 seconds depending on game. The host can return everyone to lobby or start another game.
 
-Open http://localhost:3000, then join with another tab or device.
+Optional synthesized background music is off by default; tap **MUSIC ON** to hear it.
 
-Files: `server.js` handles room codes, movement, match timing and scoring; `index.html` contains the lobby and 2D Canvas games; `fishing.html` contains the original first-person WebGL fishing experience, integrated into the match as an iframe.
+## Files
 
-Tank controls: **WASD / arrows** to drive, **mouse** to aim, **hold left-click / Space** to fire, **Shift** to dash, **F** to toggle fullscreen. On mobile, use virtual movement / FIRE with auto-aim at enemy tanks.
+- `server.js`: room codes, host authority, match clock, score collection, server events and static HTML routes.
+- `index.html`: lobby, mode selection, room header, score table, iframe transition.
+- `classic.html`: original Explore & Earn v21 (Tank Survival, Skybound Trials, Nebula Endless) with a small Party Arena score-message bridge.
+- `fishing.html`: original first-person 3D fishing WebGL page with a catch-message bridge.
 
-## Free Render deployment
+## Local run / Render
 
-Runtime: Node, Build: `npm install`, Start: `node server.js`. Rooms and scores are stored in server memory only. They disappear when the server restarts or the Render free instance sleeps. This project is a functional prototype, not a production-grade scalable multiplayer service; players should expect some network delay.
+Node.js 18+: `node server.js`. Open http://localhost:3000. No third-party npm dependencies.
+
+Render Web Service: build `npm install`, start `node server.js`, branch `main`. Previously used public URL: https://party-arena-2.onrender.com/ .
+
+Rooms and scores are stored in memory: they disappear if the free Render instance sleeps or restarts. Rendering quality depends on the browser and graphics acceleration.
