@@ -61,7 +61,7 @@ let cachedObstacles=null,lastPaintAt=0,lastMinimapAt=0,blend=.24,terrainGradient
 let lastSentInput=null,lastInputEmit=0,sessionToken='',inputBusy=false,latestQueuedInput=null,estimatedRtt=130;
 let predictedLocal=null,localDrawPose=null,snapshotLocalAt=0;
 let framesInWindow=0,fpsWindowStarted=0,hasRealRtt=false,lowGraphics=lowPower,slowFpsWindows=0;
-const frameInterval=lowPower?23:13; // aim for 30-45 FPS on touch, up to 60 FPS on desktop
+const frameInterval=15; // aim for up to 60 FPS even on touch; LITE reduces the work per frame
 function visible(x,y,pad=60){
  return x>=view.x-pad&&y>=view.y-pad&&x<=view.x+size.w/view.scale+pad&&y<=view.y+size.h/view.scale+pad;
 }
