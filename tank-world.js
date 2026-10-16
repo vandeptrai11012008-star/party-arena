@@ -228,7 +228,8 @@ function tick(r,t,dt){
  if(!w.startedAt)w.startedAt=t;
  for(const p of r.players){
   if(p.respawnAt){if(t>=p.respawnAt)spawnPlayer(w,p,t);else continue}
-  const stale=t-(p.lastInput||0)>650;
+  // A little extra tolerance avoids stop-start motion on jittery mobile networks.
+  const stale=t-(p.lastInput||0)>900;
   const input=stale?{dx:0,dy:0,angle:p.angle,fire:false,dash:false}:p.input||{};
   let dx=clamp(Number(input.dx)||0,-1,1),dy=clamp(Number(input.dy)||0,-1,1);
   const magnitude=len(dx,dy);
