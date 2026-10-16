@@ -31,7 +31,7 @@ function cleanName(n){return String(n||'').trim().replace(/[<>]/g,'').slice(0,18
 function makePlayer(name,slot){return {id:uuid(),token:uuid(),name,slot,score:0,kills:0,deaths:0,x:SPAWNS[slot][0],y:SPAWNS[slot][1],angle:0,bodyAngle:0,hp:100,shield:0,speedUntil:0,invUntil:0,respawnAt:0,online:false,fireAt:0,dashAt:0,dashHeld:false,input:{dx:0,dy:0,angle:0,fire:false,dash:false},lastInput:0}}
 function resetPlayer(p){const xy=SPAWNS[p.slot%SPAWNS.length];p.vy=0;p.grounded=false;p.jumpHeld=false;p.lapCooldown=0;p.lastCatch=0;p.fishClaims=0;p.lastClassicReport=0;p.x=xy[0];p.y=xy[1];p.angle=0;p.bodyAngle=0;p.hp=100;p.shield=0;p.speedUntil=0;p.invUntil=now()+2000;p.respawnAt=0;p.fireAt=0;p.dashAt=0;p.dashHeld=false;p.score=0;p.kills=0;p.deaths=0;p.input={dx:0,dy:0,angle:0,fire:false,dash:false};p.lastInput=now()}
 function playerView(p){return {id:p.id,name:p.name,slot:p.slot,x:Math.round(p.x),y:Math.round(p.y),a:p.angle,bodyA:p.bodyAngle,hp:p.hp,shield:p.shield,score:p.score,kills:p.kills,deaths:p.deaths,online:p.online,respawnAt:p.respawnAt,invUntil:p.invUntil,speedUntil:p.speedUntil,dashAt:p.dashAt,vy:p.vy,grounded:p.grounded,fishClaims:p.fishClaims}}
-function stateFor(r,token){
+function stateFor(r,token,includeTankObstacles=true){
  const p=[...r.players,...r.spectators].find(x=>x.token===token);
  return {code:r.code,phase:r.phase,me:p?.id,host:r.host,isHost:p?.id===r.host,isSpectator:!!p&&!r.players.includes(p),
  serverNow:now(),endsAt:r.endsAt,round:r.round,gameId:r.gameId,practice:r.practice,games:Object.values(GAMES),players:r.players.map(playerView),spectators:r.spectators.map(x=>({id:x.id,name:x.name})),
@@ -43,31 +43,31 @@ function stateFor(r,token){
  platforms:r.gameId==='jumping'?PLATFORMS:[],
  asteroids:r.gameId==='space'&&r.phase==='playing'?r.meteors.map(m=>({x:Math.round(m.x),y:Math.round(m.y),r:m.r,hp:m.hp})):[],mobs:r.gameId==='tank'&&r.phase==='playing'?r.mobs.map(m=>({x:Math.round(m.x),y:Math.round(m.y),hp:m.hp,maxHp:m.maxHp,kind:m.kind,a:m.a})):[],
  fx:r.phase==='playing'?r.fx.map(f=>({x:f.x,y:f.y,type:f.type,id:f.id})):[],
- champion:r.champion,tank:r.gameId==='tank'&&r.phase!=='lobby'?tankWorld.view(r):null,arena:{w:W,h:H,obstacles:r.gameId==='tank'?r.obstacles:[]}
+ champion:r.champion,tank:r.gameId==='tank'&&r.phase!=='lobby'?tankWorld.view(r,includeTankObstacles):null,arena:{w:W,h:H,obstacles:r.gameId==='tank'?r.obstacles:[]}
  };
 }
 function push(r){
  if(!r.clients.size)return;
- // Build and serialize the shared world once, not once per connected player.
- const sample=stateFor(r,r.clients.keys().next().value);
+ const activeTank=r.gameId==='tank'&&!!r.tank;
+ const liveClients=[...r.clients].filter(([token,res])=>!res.destroyed&&!res.writableEnded&&(res.writableLength||0)<160000);
+ if(!liveClients.length)return;
+ const layoutVersion=activeTank?r.tank.layoutVersion:0;
+ const requiresMap=activeTank&&liveClients.some(([,res])=>res._tankLayoutVersion!==layoutVersion);
+ // On a typical tick, do not even traverse the static obstacle list.
+ // When someone joins or cover changes, generate the full layout just once.
+ const sample=stateFor(r,liveClients[0][0],requiresMap);
  const {me,isHost,isSpectator,...shared}=sample;
  const full=JSON.stringify(shared).slice(0,-1);
- // Tank cover rarely changes; send the full obstacle list only to clients
- // whose latest known layout revision differs from the authoritative map.
- const inTank=r.gameId==='tank'&&r.tank&&shared.tank;
- const compact=inTank?JSON.stringify({...shared,tank:{...shared.tank,obstacles:null}}).slice(0,-1):null;
+ const compact=requiresMap?JSON.stringify({...shared,tank:{...shared.tank,obstacles:null}}).slice(0,-1):full;
  const players=new Map([...r.players,...r.spectators].map(p=>[p.token,p]));
- for(const [token,res] of r.clients){
+ for(const [token,res] of liveClients){
   const p=players.get(token);
-  if(!p||res.destroyed||res.writableEnded){r.clients.delete(token);continue}
-  // Skip stale snapshots instead of filling a slow browser's network buffer.
-  if((res.writableLength||0)>160000)continue;
-  const needsLayout=!!compact&&res._tankLayoutVersion!==r.tank.layoutVersion;
-  const base=compact&&!needsLayout?compact:full;
-  const payload=base+',"me":'+JSON.stringify(p.id)+',"isHost":'+(p.id===r.host)+',"isSpectator":'+(!r.players.includes(p))+'}';
+  if(!p){r.clients.delete(token);continue}
+  const needsLayout=activeTank&&res._tankLayoutVersion!==layoutVersion;
+  const payload=(needsLayout?full:compact)+',"me":'+JSON.stringify(p.id)+',"isHost":'+(p.id===r.host)+',"isSpectator":'+(!r.players.includes(p))+'}';
   try{
    res.write('data: '+payload+'\n\n');
-   if(needsLayout)res._tankLayoutVersion=r.tank.layoutVersion;
+   if(needsLayout)res._tankLayoutVersion=layoutVersion;
   }catch{r.clients.delete(token)}
  }
 }
