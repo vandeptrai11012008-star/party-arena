@@ -40,7 +40,7 @@ function stateFor(r,token){
  pickups:r.phase==='playing'?r.pickups.filter(x=>x.active).map(x=>({x:x.x,y:x.y,type:x.type})):[],
  stars:r.gameId==='jumping'&&r.phase==='playing'?r.gems.filter(g=>g.active).map(g=>({x:Math.round(g.x),y:Math.round(g.y)})):[],
  platforms:r.gameId==='jumping'?PLATFORMS:[],
- asteroids:r.gameId==='space'&&r.phase==='playing'?r.meteors.map(m=>({x:Math.round(m.x),y:Math.round(m.y),r:m.r,hp:m.hp})):[],mobs:r.gameId==='tank'&&r.phase==='playing'?r.mobs.map(m=>({x:Math.round(m.x),y:Math.round(m.y),hp:m.hp})):[],
+ asteroids:r.gameId==='space'&&r.phase==='playing'?r.meteors.map(m=>({x:Math.round(m.x),y:Math.round(m.y),r:m.r,hp:m.hp})):[],mobs:r.gameId==='tank'&&r.phase==='playing'?r.mobs.map(m=>({x:Math.round(m.x),y:Math.round(m.y),hp:m.hp,maxHp:m.maxHp,kind:m.kind,a:m.a})):[],
  fx:r.phase==='playing'?r.fx.map(f=>({x:f.x,y:f.y,type:f.type,id:f.id})):[],
  champion:r.champion,arena:{w:W,h:H,obstacles:r.gameId==='tank'?r.obstacles:[]}
  };
