@@ -1,13 +1,12 @@
 'use strict';
-// Authoritative 2-8 player Tank Survival world for Party Arena.
+// Authoritative 2-4 player Tank Survival world for Party Arena.
 // All movement, shell hits, enemy AI, pickups and destructible cover are computed on the Node server.
 const W=4200,H=2600;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const rand=(a,b)=>a+Math.random()*(b-a);
 const len=(a,b)=>Math.hypot(a,b);
 const spawnPoints=[
- [1920,1130],[2280,1460],[2250,1110],[1890,1480],
- [2060,1010],[2060,1620],[1780,1300],[2400,1300]
+ [1920,1130],[2280,1460],[2250,1110],[1890,1480]
 ];
 let serial=1;
 function effect(w,x,y,type){w.fx.push({id:serial++,x:Math.round(x),y:Math.round(y),type,until:Date.now()+330});if(w.fx.length>40)w.fx.shift()}
@@ -38,7 +37,7 @@ function create(r){
  const w={w:W,h:H,obstacles:[],bullets:[],enemyBullets:[],mobs:[],pickups:[],fx:[],wave:1,
     spawnAt:0,addCoverAt:Date.now()+16000,extraCover:0,layoutVersion:1,startedAt:0,serial:0};
  for(const p of r.players){
-  const pos=spawnPoints[p.slot%8];p.x=pos[0];p.y=pos[1];
+  const pos=spawnPoints[p.slot%4];p.x=pos[0];p.y=pos[1];
   p.hp=100;p.shield=0;p.invUntil=Date.now()+2800;p.respawnAt=0;
   p.angle=0;p.bodyAngle=0;p.fireAt=0;p.dashAt=0;p.tankDashUntil=0;p.dashHeld=false;
   p.score=0;p.kills=0;p.deaths=0;
@@ -64,7 +63,7 @@ function spawnEnemy(w,players){
  return {id:serial++,x:rand(100,W-100),y:rand(100,H-100),hp:3,maxHp:3,kind:'standard',angle:0,speed:70,fireAt:Date.now()+1600,ramAt:0}
 }
 function spawnPlayer(w,p,t){
- const base=spawnPoints[p.slot%8];
+ const base=spawnPoints[p.slot%4];
  let x=base[0],y=base[1];
  for(let k=0;k<60;k++){
   const ang=k*2.399963229728653;
@@ -268,7 +267,7 @@ function view(r,includeObstacles=true){
 function join(r,p){
  if(!r.tank)return;
  const t=Date.now();
- const base=spawnPoints[p.slot%8];p.x=base[0];p.y=base[1];
+ const base=spawnPoints[p.slot%4];p.x=base[0];p.y=base[1];
  p.hp=100;p.shield=0;p.score=0;p.kills=0;p.deaths=0;
  p.invUntil=t+2200;p.respawnAt=0;p.fireAt=t+400;
  p.bodyAngle=0;p.angle=0;p.dashAt=0;p.tankDashUntil=0;
