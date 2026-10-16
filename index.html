@@ -58,11 +58,18 @@ function now(){return Date.now()-offset}
 function clock(ms){let n=Math.max(0,Math.ceil(ms/1000));return Math.floor(n/60)+':'+String(n%60).padStart(2,'0')}
 let boardHash='',overlayPhase='',classicLoadedPath='',lastClassicScoreSent=0,tankInputBusy=false,tankMapCache=null,tankInputQueue=null;
 function syncClassic(){
+ // The first full Tank layout arrives during the countdown, before the
+ // embedded game exists. Preserve it for the iframe's initial handshake.
+ if(s?.gameId==='tank'&&s.tank&&Array.isArray(s.tank.obstacles)){
+  tankMapCache=s.tank.obstacles;
+ }
  const active=!!s&&s.phase==='playing'&&['tank','fishing','jumping','space'].includes(s.gameId);
  $('classicShell').classList.toggle('hidden',!active);
  if(!active){
   if(classicLoadedPath){classicLoadedPath='';$('classicFrame').src='about:blank'}
-  tankMapCache=null;tankInputQueue=null;
+  // Countdown is not a page teardown; preserve the map for the first frame.
+  if(!s||s.phase==='lobby'||s.phase==='done'||s.gameId!=='tank')tankMapCache=null;
+  tankInputQueue=null;
   return;
  }
  const url=s.gameId==='fishing'?'/fishing.html':s.gameId==='tank'?'/tank-shared.html':'/classic.html?partyMode='+encodeURIComponent(s.gameId);
