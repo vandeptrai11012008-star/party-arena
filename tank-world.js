@@ -264,4 +264,13 @@ function view(r){
    fx:w.fx.map(f=>({id:f.id,x:f.x,y:f.y,type:f.type}))
  };
 }
-module.exports={create,tick,view,W,H};
+function join(r,p){
+ if(!r.tank)return;
+ const t=Date.now();
+ const base=spawnPoints[p.slot%8];p.x=base[0];p.y=base[1];
+ p.hp=100;p.shield=0;p.score=0;p.kills=0;p.deaths=0;
+ p.invUntil=t+2200;p.respawnAt=0;p.fireAt=t+400;
+ p.bodyAngle=0;p.angle=0;p.dashAt=0;p.tankDashUntil=0;
+ spawnPlayer(r.tank,p,t);
+}
+module.exports={create,join,tick,view,W,H};
