@@ -37,6 +37,18 @@ Tank Online now uses several optimizations designed especially for Render Free a
 
 In an earlier eight-client mocked-network test (before the four-player limit), one initial full game snapshot was about 9.3 KB and a routine compact update about 4.8 KB (~49% smaller). In a two-client fixture, updates fell from about 7.6 KB to 3.1 KB (~59% smaller). These are **sample payload measurements**, not internet speed or real-device FPS benchmarks. Functional checks also covered map revisions, late join, rematch, PvP and mobile script rendering. Actual gameplay smoothness still depends on device GPU, latency and Render CPU availability.
 
+### Smooth Tank update
+
+The latest performance pass addresses an important CPU/GPU problem: Party Arena was still drawing the *old hidden Canvas game underneath the actual Tank iframe* every animation frame. The redundant renderer now stops for all four HTML games.
+
+- **Instant local Tank driving:** the tank follows keyboard and joystick input immediately on the player's device, with gentle correction against authoritative server positions and obstacles. Server ownership of hit points, damage, pickups and player interactions is unchanged.
+- **Direct same-origin input:** the Tank iframe can POST to the existing /api/input endpoint, avoiding an extra parent-window relay; slow requests keep only the newest movement command.
+- **Measured latency:** the Tank overlay displays actual client FPS and observed input-request RTT in milliseconds. RTT includes network and HTTP response time; it is not a separate server-processing benchmark.
+- **Mobile performance mode:** light terrain ornaments, fewer particles, off-screen particle culling, capped particle counts and lower drawing resolution. Desktop switches to this quality mode automatically after sustained low FPS.
+- **No artificial 30 FPS mobile cap:** rendering may reach 60 FPS on devices fast enough to sustain it.
+
+This improves local response and browser load, but does not guarantee a particular FPS or eliminate internet latency or Render Free resource constraints. Render deployment must be confirmed as **Live** before testing the latest code.
+
 ## The other three modes
 
 These **retain the original HTML gameplay on each player's device** and compete on shared room scores; they are **not yet shared-world multiplayer**.
