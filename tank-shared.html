@@ -14,7 +14,7 @@ html,body{height:100%;width:100%;overflow:hidden;margin:0;background:#1f4e4d;tou
 .hpRow{display:flex;align-items:center;justify-content:space-between;gap:13px;font-size:12px;font-weight:900}
 .hpTrack{background:#16363d;height:11px;border-radius:20px;margin-top:8px;overflow:hidden;box-shadow:inset 0 1px 4px #0009}
 .hpTrack>div{height:100%;width:100%;background:linear-gradient(90deg,#58dc83,#a2f6b6);border-radius:20px;transition:width .13s}
-.shield{font-size:11px;color:#afdcff;letter-spacing:.2px;margin-top:7px}
+.shield{font-size:11px;color:#afdcff;letter-spacing:.2px;margin-top:7px}.perfStat{font-size:10px;color:#abd8d4;font-weight:700;margin-top:5px;letter-spacing:.3px}
 #map{position:fixed;right:16px;top:13px;width:185px;height:115px;border:1px solid #9fc7ba91;background:#052132d9;border-radius:10px;box-shadow:0 9px 25px #0008;z-index:2}
 #help{position:fixed;left:14px;bottom:13px;max-width:600px;padding:10px 13px;line-height:1.6;pointer-events:none;color:#d8e7df;font-size:11px;z-index:2}
 #notice{position:fixed;left:50%;top:17px;transform:translateX(-50%);padding:10px 17px;font-weight:850;text-align:center;white-space:nowrap;letter-spacing:.5px;font-size:12px;pointer-events:none;z-index:3}
@@ -34,7 +34,7 @@ html,body{height:100%;width:100%;overflow:hidden;margin:0;background:#1f4e4d;tou
 </style></head><body>
 <canvas id="arena"></canvas><canvas id="map" width="370" height="230"></canvas>
 <div class="hud">
- <div class="glass status"><span>🛡️ TANK SURVIVAL ONLINE</span><div><strong id="points">0</strong> PTS · <span id="ko">0</span> KOs</div></div>
+ <div class="glass status"><span>🛡️ TANK SURVIVAL ONLINE</span><div><strong id="points">0</strong> PTS · <span id="ko">0</span> KOs</div><div id="perfStat" class="perfStat">FPS — · RTT —</div></div>
  <div class="glass hp"><div class="hpRow"><span>ARMOUR</span><span id="hp">100 / 100</span></div>
  <div class="hpTrack"><div id="hpBar"></div></div><div id="power" class="shield">⬡ SHIELD 0 · DASH READY</div></div>
 </div>
@@ -60,6 +60,7 @@ const lowPower=!!(window.matchMedia?.('(pointer: coarse)')?.matches)||window.inn
 let cachedObstacles=null,lastPaintAt=0,lastMinimapAt=0,blend=.24,terrainGradient=null;
 let lastSentInput=null,lastInputEmit=0,sessionToken='',inputBusy=false,latestQueuedInput=null,estimatedRtt=130;
 let predictedLocal=null,localDrawPose=null,snapshotLocalAt=0;
+let framesInWindow=0,fpsWindowStarted=0,hasRealRtt=false;
 const frameInterval=lowPower?23:13; // aim for 30-45 FPS on touch, up to 60 FPS on desktop
 function visible(x,y,pad=60){
  return x>=view.x-pad&&y>=view.y-pad&&x<=view.x+size.w/view.scale+pad&&y<=view.y+size.h/view.scale+pad;
@@ -222,7 +223,7 @@ async function sendInputToServer(input){
     });
     if(!response.ok)throw Error('Tank input request failed');
     const rtt=performance.now()-sentAt;
-    estimatedRtt=estimatedRtt*.83+trim(rtt,5,700)*.17;
+    estimatedRtt=estimatedRtt*.83+trim(rtt,5,700)*.17;hasRealRtt=true;
    }catch(e){
     // Compatibility fallback when direct input is temporarily unavailable.
     sendParent({type:'party-tank-input',input:current});
@@ -407,6 +408,13 @@ function draw(timestamp){
  if(document.hidden)return; // battery and CPU saver for background browser tabs
  if(timestamp-lastPaintAt<frameInterval)return;
  lastPaintAt=timestamp;
+ framesInWindow++;
+ if(!fpsWindowStarted)fpsWindowStarted=timestamp;
+ if(timestamp-fpsWindowStarted>=1200){
+  const fps=Math.round(framesInWindow*1000/(timestamp-fpsWindowStarted));
+  $('perfStat').textContent='FPS '+fps+' · RTT '+(hasRealRtt?Math.round(estimatedRtt)+' ms':'—');
+  framesInWindow=0;fpsWindowStarted=timestamp;
+ }
  if(!size.w)initCanvas();
  const dt=trim((timestamp-(lastTime||timestamp))/1000,.001,.065);lastTime=timestamp;
  blend=1-Math.exp(-dt*18);
