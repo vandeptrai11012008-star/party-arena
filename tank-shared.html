@@ -123,7 +123,7 @@ function predictOwn(p,dt,world){
  const t=Date.now()-serverOffset;
  if(p.respawnAt&&p.respawnAt>t){predictedLocal=null;return {x:p.x,y:p.y,a:p.a,bodyA:p.bodyA}}
  if(!predictedLocal||Math.hypot(predictedLocal.x-p.x,predictedLocal.y-p.y)>240){
-  predictedLocal={x:p.x,y:p.y,a:p.a||0,bodyA:p.bodyA||0,dashUntil:0,dashHeld:false};
+  predictedLocal={x:p.x,y:p.y,a:p.a||0,bodyA:p.bodyA||0,dashUntil:0,dashHeld:false,lastMotionAt:-1e6};
  }
  const cmd=makeInput();
  let dx=trim(Number(cmd.dx)||0,-1,1),dy=trim(Number(cmd.dy)||0,-1,1);
@@ -136,6 +136,7 @@ function predictOwn(p,dt,world){
  let speed=p.speedUntil>t?285:205;
  if(performance.now()<predictedLocal.dashUntil)speed*=2.6;
  if(mag>.06){
+  predictedLocal.lastMotionAt=performance.now();
   predictedLocal.bodyA=Math.atan2(dy,dx);
   const nx=predictedLocal.x+dx*speed*dt,ny=predictedLocal.y+dy*speed*dt;
   if(!localBlocked(nx,predictedLocal.y,world,p))predictedLocal.x=nx;
@@ -150,8 +151,9 @@ function predictOwn(p,dt,world){
  if(error>220){
   // Death / teleport / hard collision: never keep a stale prediction.
   predictedLocal.x=p.x;predictedLocal.y=p.y;predictedLocal.dashUntil=0;
- }else if(error>.75){
-  const strength=1-Math.exp(-dt*(error>65?8:3.2));
+ }else if(error>.75&&!(mag<.06&&performance.now()-predictedLocal.lastMotionAt<Math.min(400,estimatedRtt+140)&&error<130)){
+  // Let delayed server snapshots catch up after a sudden key release.
+  const strength=1-Math.exp(-dt*(error>65?6:2.6));
   const nx=predictedLocal.x+(sx-predictedLocal.x)*strength;
   const ny=predictedLocal.y+(sy-predictedLocal.y)*strength;
   if(!localBlocked(nx,predictedLocal.y,world,p))predictedLocal.x=nx;
