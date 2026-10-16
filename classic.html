@@ -152,7 +152,7 @@ function hideModal(){$("overlay").classList.add("hidden");paused=false}
 function startGame(){prepare();running=true;finished=false;hideModal();menu()}
 function prepare(){running=false;paused=true;finished=false;elapsed=0;score=0;particles.length=0;const cfg=config();if(isEndless())level=1;
 if(mode.id==="fishing"){state={boatX:470,hookY:0,cast:false,fish:[],bubbles:[],hookX:0,hookFish:null,rodAngle:0.45,tension:0,stamina:0,reelProgress:0,fishPull:0,misses:0};for(let i=0;i<9+level*2;i++)spawnFish()}
-if(mode.id==="tank"){state={tank:{x:110,y:270,a:0},enemies:[],bullets:[],enemyBullets:[],cooldown:0,spawn:0,hp:5+rank("tankArmor")-Math.floor((level-1)/3),maxHp:5+rank("tankArmor")-Math.floor((level-1)/3),invuln:0,obstacles:[],pickup:[],hits:0,worldW:2200,camera:0,wave:1};
+if(mode.id==="tank"){state={tank:{x:110,y:270,a:0},enemies:[],bullets:[],enemyBullets:[],cooldown:0,spawn:0,hp:5+rank("tankArmor")-Math.floor((level-1)/3),maxHp:5+rank("tankArmor")-Math.floor((level-1)/3),invuln:0,obstacles:[],destroyedObstacles:[],coverSpawnTimer:16,coverSpawnCount:0,pickup:[],hits:0,worldW:2200,camera:0,wave:1};
 const tankMaps=[
 [{x:310,y:70,w:75,h:175},{x:555,y:295,w:75,h:175},{x:725,y:100,w:70,h:90}],
 [{x:240,y:90,w:80,h:80},{x:240,y:355,w:80,h:85},{x:480,y:170,w:90,h:190},{x:760,y:75,w:65,h:155}],
@@ -164,12 +164,16 @@ state.obstacles=tankMaps[level-1].map(o=>({...o}));
 for(let section=1;section<Math.ceil(state.worldW/960);section++){
 for(const o of tankMaps[level-1])state.obstacles.push({x:o.x+section*850,y:o.y,w:o.w,h:o.h})
 }
-state.obstacles=state.obstacles.filter(o=>o.x<state.worldW-50).map((o,i)=>({...o,type:["concrete","crate","steel","sandbag","barrel"][(i+level)%5],hp:2}));
+state.obstacles=state.obstacles.filter(o=>o.x<state.worldW-50).map((o,i)=>{
+ const type=["concrete","crate","steel","sandbag","barrel"][(i+level)%5];
+ const hp=type==="sandbag"?3:2;
+ return {...o,type,hp,maxHp:hp};
+});
 // Additional small cover objects in different patterns per map.
 for(let i=0;i<5+level*2;i++){
  const x=450+i*155+((i*level*37)%63),y=60+((i*117+level*53)%395);
  if(x<state.worldW-100&&!state.obstacles.some(o=>x+48>o.x&&x<o.x+o.w&&y+45>o.y&&y<o.y+o.h))
- state.obstacles.push({x,y,w:level>2?52:44,h:level>2?46:39,type:i%3===0?"barrel":i%3===1?"crate":"sandbag",hp:2});
+ state.obstacles.push({x,y,w:level>2?52:44,h:level>2?46:39,type:i%3===0?"barrel":i%3===1?"crate":"sandbag",hp:i%3===2?3:2,maxHp:i%3===2?3:2});
 }
 for(let i=0;i<Math.min(5,3+level);i++)spawnEnemy();
  for(let i=0;i<2+level;i++){const x=600+i*460;if(x<state.worldW-120)state.pickup.push({x,y:100+(i%3)*155,type:i%2?"repair":"boost",collected:false})}}
@@ -220,9 +224,53 @@ if(mode.id==="space"){
 }
 function spawnFish(){state.fish.push({x:rand(35,925),y:rand(300,500),vx:rand(.6,1.6)*(Math.random()<.5?-1:1)*(1+level*.14),r:rand(12,23),color:["#f7a85a","#ee7ca2","#a6e7eb","#f7db74"][Math.floor(rand(0,4))]})}
 function blocked(x,y,r=25){return state.obstacles?.some(o=>x+r>o.x&&x-r<o.x+o.w&&y+r>o.y&&y-r<o.y+o.h)}
+// Red Standard/Heavy tanks need three direct hits. Orange Scouts remain one-hit.
+const TANK_RED_HITS=3;
+const TANK_OBSTACLE_RESPAWN_SECONDS=12;
+const TANK_NEW_COVER_EVERY_SECONDS=16;
+const TANK_MAX_EXTRA_COVER=9;
+function tankCoverAreaClear(o,s,margin=12){
+ if(o.x<30||o.y<30||o.x+o.w>s.worldW-30||o.y+o.h>H-25)return false;
+ const overlaps=(b)=>o.x< b.x+b.w+margin&&o.x+o.w+margin>b.x&&o.y<b.y+b.h+margin&&o.y+o.h+margin>b.y;
+ if(s.obstacles.some(overlaps))return false;
+ if(s.destroyedObstacles.some(d=>d!==o&&overlaps(d)))return false;
+ const close=(p,r=48)=>p.x>o.x-r&&p.x<o.x+o.w+r&&p.y>o.y-r&&p.y<o.y+o.h+r;
+ if(close(s.tank,55)||s.enemies.some(e=>close(e,42)))return false;
+ if(s.pickup.some(p=>!p.collected&&close(p,26)))return false;
+ return true;
+}
+function tankSpawnCover(s){
+ if(s.coverSpawnCount>=TANK_MAX_EXTRA_COVER)return false;
+ for(let i=0;i<45;i++){
+  const x=clamp(s.tank.x+rand(-420,580),75,s.worldW-135);
+  const y=rand(65,H-110);
+  const type=Math.random()<.55?"crate":"barrel";
+  const o={x:Math.round(x),y:Math.round(y),w:type==="crate"?55:46,h:type==="crate"?54:48,type,hp:2,maxHp:2,extra:true};
+  if(!tankCoverAreaClear(o,s,24))continue;
+  s.obstacles.push(o);s.coverSpawnCount++;
+  burst(o.x+o.w/2,o.y+o.h/2,type==="crate"?"#e2bd86":"#ffad79",12,55);
+  return true;
+ }
+ return false;
+}
+function tankUpdateCover(s,dt){
+ for(let i=s.destroyedObstacles.length-1;i>=0;i--){
+  const o=s.destroyedObstacles[i];
+  if(elapsed<o.respawnAt)continue;
+  if(!tankCoverAreaClear(o,s,10)){o.respawnAt=elapsed+2;continue}
+  s.destroyedObstacles.splice(i,1);
+  s.obstacles.push({...o,hp:o.maxHp,respawnAt:undefined});
+  burst(o.x+o.w/2,o.y+o.h/2,"#ccedaf",12,65);
+ }
+ if(s.coverSpawnCount>=TANK_MAX_EXTRA_COVER)return;
+ s.coverSpawnTimer-=dt;
+ if(s.coverSpawnTimer>0)return;
+ const spawned=tankSpawnCover(s);
+ s.coverSpawnTimer=spawned?TANK_NEW_COVER_EVERY_SECONDS:3;
+}
 function spawnEnemy(){let x=600,y=270,s=state;for(let i=0;i<45;i++){x=clamp(s.tank.x+rand(320,660)*(Math.random()<.25?-1:1),60,s.worldW-60);y=rand(50,490);if(!blocked(x,y,32)&&Math.hypot(x-s.tank.x,y-s.tank.y)>210)break}
  const roll=Math.random(),danger=Math.floor(elapsed/35),kind=danger>=3&&roll>.73?"heavy":roll>.43?"scout":"standard";
- s.enemies.push({x,y,vx:rand(-18,18),vy:rand(-18,18),hp:kind==="heavy"?4:kind==="scout"?1:elapsed>80?2:1,maxHp:kind==="heavy"?4:kind==="scout"?1:elapsed>80?2:1,kind,fire:rand(.6,1.5),telegraph:0,phase:rand(0,6.28)})}
+ s.enemies.push({x,y,vx:rand(-18,18),vy:rand(-18,18),hp:kind==="scout"?1:TANK_RED_HITS,maxHp:kind==="scout"?1:TANK_RED_HITS,kind,fire:rand(.6,1.5),telegraph:0,phase:rand(0,6.28)})}
 function spawnRock(){const s=state;s.rocks.push({x:rand(120,s.worldW-50),y:rand(60,s.worldH-50),r:rand(10,19),color:["#9d83e9","#66ddca","#f9cf73"][Math.floor(rand(0,3))]})}
 function spawnSpaceEnemy(){const s=state,p=s.ship;let x,y;for(let i=0;i<50;i++){const a=rand(0,Math.PI*2),dd=rand(360,710);x=clamp(p.x+Math.cos(a)*dd,55,s.worldW-55);y=clamp(p.y+Math.sin(a)*dd,55,s.worldH-55);if(Math.hypot(x-p.x,y-p.y)>290)break}
  const danger=Math.floor(elapsed/30),roll=Math.random(),early=elapsed<40,kind=early?(roll>.76?"interceptor":"drone"):(danger>=3&&roll>.72?"gunship":roll>.38?"interceptor":"drone");
@@ -260,7 +308,9 @@ if(s.hookFish){const f=s.hookFish;s.fishPull+=dt*(2+level*.6);const pull=(Math.s
 if(s.tension>=100){s.cast=false;s.hookFish=null;s.hookY=0;s.misses++;toast("LINE SNAPPED! Release SPACE when tension is high")}
 else if(s.reelProgress>=100||s.stamina<=0){score++;s.cast=false;s.hookFish=null;s.hookY=0;s.fish=s.fish.filter(v=>v!==f);spawnFish();toast("FISH LANDED! Great reeling!")}}}
 if(mode.id==="tank"){
- const s=state,t=s.tank,dx=(keys.right?1:0)-(keys.left?1:0),dy=(keys.down?1:0)-(keys.up?1:0);
+ const s=state,t=s.tank;
+ tankUpdateCover(s,dt);
+ const dx=(keys.right?1:0)-(keys.left?1:0),dy=(keys.down?1:0)-(keys.up?1:0);
  const mag=Math.hypot(dx,dy)||1,speed=175*(1+.13*rank("tankEngine"));
  const nx=clamp(t.x+dx/mag*speed*dt,24,s.worldW-24),ny=clamp(t.y+dy/mag*speed*dt,24,H-24);
  if(!blocked(nx,t.y,25))t.x=nx;if(!blocked(t.x,ny,25))t.y=ny;
@@ -272,11 +322,18 @@ if(mode.id==="tank"){
  function ricochet(b,enemy){
   let hit=false;for(const o of s.obstacles){if(b.x<o.x-7||b.x>o.x+o.w+7||b.y<o.y-7||b.y>o.y+o.h+7)continue;
    const px=b.x-b.vx*dt,py=b.y-b.vy*dt;
-   if(!enemy&&(o.type==="crate"||o.type==="barrel")){o.hp-=1;b.life=0;burst(b.x,b.y,o.type==="barrel"?"#ff9e67":"#dba773",13,120);
-    if(o.hp<=0){s.obstacles.splice(s.obstacles.indexOf(o),1);if(o.type==="barrel"){
-     for(const e of s.enemies)if(Math.hypot(e.x-b.x,e.y-b.y)<100){e.hp-=2;burst(e.x,e.y,"#ffc27d",9)}
-    }}sound("hit");return true}
-   if(o.type==="sandbag"){b.life=0;burst(b.x,b.y,"#c1b38e",7,55);return true}
+   if(o.type==="crate"||o.type==="barrel"||o.type==="sandbag"){
+    o.hp-=1;b.life=0;
+    burst(b.x,b.y,o.type==="barrel"?"#ff9e67":o.type==="sandbag"?"#c1b38e":"#dba773",o.hp<=0?14:7,100);
+    if(o.hp<=0){
+     s.obstacles.splice(s.obstacles.indexOf(o),1);
+     s.destroyedObstacles.push({...o,hp:0,respawnAt:elapsed+TANK_OBSTACLE_RESPAWN_SECONDS});
+     if(o.type==="barrel"){
+      for(const e of s.enemies)if(Math.hypot(e.x-b.x,e.y-b.y)<100){e.hp-=2;burst(e.x,e.y,"#ffc27d",9)}
+     }
+    }
+    sound("hit");return true
+   }
    if(px<=o.x-7||px>=o.x+o.w+7)b.vx*=-1;else b.vy*=-1;
    b.x=px;b.y=py;b.bounces=(b.bounces||0)+1;burst(b.x,b.y,"#fbf2cf",5,75);sound("hit");hit=true;break
   }return hit
