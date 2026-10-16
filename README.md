@@ -5,14 +5,14 @@ Four browser games share room codes, a host-controlled lobby, a timer and a live
 ## Tank Survival Online — real-time multiplayer
 
 - **One shared map:** 4,200 × 2,600 pixels. The server owns world position and state.
-- **2–8 players:** each drives a separate coloured tank, visible to everyone with their nickname, armour and position.
+- **2–4 players:** each drives a separate coloured tank, visible to everyone with their nickname, armour and position.
 - **Interaction:** battle other players (PvP), attack shared red/orange AI tanks (PvE), collide with other tanks and terrain, and pick up upgrades.
 - **Tank behaviour:** tracked body and independent turret visuals based on the original Explore & Earn v21 Tank model.
 - **Server-side authority:** driving, shells, collision, hit points, score, respawning, NPCs and destructible cover are all decided by the server, not by a player's browser.
 - **Enemy tanks:** Scouts require one direct hit; Standard/Heavy red AI tanks require three.
 - **Destructible obstacles:** wooden crates and barrels take two hits, sandbags take three, and regenerate **12 seconds** after destruction if the space is clear. Additional cover can appear every **16 seconds**, with a cap of 9 new obstacles per match. Steel supports one shell ricochet.
 - **Extras:** minimap, camera tracking, mobile joystick and buttons, ammo effects, 5 increasingly challenging waves, and a five-minute round.
-- **Join while playing:** new friends can join a running Tank match immediately when a room has an available player slot.
+- **Join while playing:** up to four total players can join a running Tank match immediately, if a slot is free.
 
 ### Tank controls
 
@@ -35,7 +35,7 @@ Tank Online now uses several optimizations designed especially for Render Free a
 
 ### Verification and limits
 
-In an eight-client mocked-network test, one initial full game snapshot was about 9.3 KB and a routine compact update about 4.8 KB (~49% smaller). In a two-client fixture, updates fell from about 7.6 KB to 3.1 KB (~59% smaller). These are **sample payload measurements**, not internet speed or real-device FPS benchmarks. Functional checks also covered map revisions, late join, rematch, PvP and mobile script rendering. Actual gameplay smoothness still depends on device GPU, latency and Render CPU availability.
+In an earlier eight-client mocked-network test (before the four-player limit), one initial full game snapshot was about 9.3 KB and a routine compact update about 4.8 KB (~49% smaller). In a two-client fixture, updates fell from about 7.6 KB to 3.1 KB (~59% smaller). These are **sample payload measurements**, not internet speed or real-device FPS benchmarks. Functional checks also covered map revisions, late join, rematch, PvP and mobile script rendering. Actual gameplay smoothness still depends on device GPU, latency and Render CPU availability.
 
 ## The other three modes
 
@@ -44,6 +44,9 @@ These **retain the original HTML gameplay on each player's device** and compete 
 - **Fishing 3D:** the original first-person WebGL lake, fishing rod and line-tension mechanic. Successful catches contribute room points.
 - **Skybound Trials (Jumping):** original v21 platform challenges, checkpoints and local progression.
 - **Nebula Endless (Space):** original v21 ship, space exploration, enemies, regional bosses and upgrades.
+
+
+**Room capacity:** maximum 4 people, including the host, across all four game modes. The fifth person receives a `Room full (4 players maximum)` message.
 
 ## Getting started
 
