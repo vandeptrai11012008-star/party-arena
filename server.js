@@ -3,10 +3,10 @@ const http=require('http'),fs=require('fs'),path=require('path'),crypto=require(
 const PORT=Number(process.env.PORT)||3000;
 const W=1800,H=1080,ROUND_MS=150000;
 const GAMES={
- tank:{id:'tank',name:'Tank Survival',duration:150000,objective:'Drive your tank, shoot drones and survive in the arena.'},
+ tank:{id:'tank',name:'Tank Survival',duration:150000,objective:'Original Explore & Earn Tank Survival HTML arena and local upgrades.'},
  fishing:{id:'fishing',name:'Fishing 3D',duration:120000,objective:'Catch fish from a boat in first person, using the original 3D lake.'},
- jumping:{id:'jumping',name:'Skybound Jumping',duration:120000,objective:'Jump across floating platforms and gather stars.'},
- space:{id:'space',name:'Space Evolution',duration:150000,objective:'Pilot a spaceship and shoot asteroids across the galaxy.'}
+ jumping:{id:'jumping',name:'Skybound Trials',duration:120000,objective:'Original Explore & Earn platform challenges, checkpoints and moving platforms.'},
+ space:{id:'space',name:'Nebula Endless',duration:150000,objective:'Original Explore & Earn space exploration, regional bosses and endless progression.'}
 };
 const rooms=new Map(),sessions=new Map();
 const now=()=>Date.now(),rand=(a,b)=>a+Math.random()*(b-a),clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
