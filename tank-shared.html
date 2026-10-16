@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Tank Survival — Shared Multiplayer Map</title>
+<style>
+:root{color-scheme:dark;font:14px system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#e8f7f0}
+*{box-sizing:border-box}
+html,body{height:100%;width:100%;overflow:hidden;margin:0;background:#1f4e4d;touch-action:none}
+#arena{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}
+.hud{position:fixed;left:14px;top:13px;display:grid;gap:8px;pointer-events:none;z-index:2}
+.glass{background:#09283dd9;border:1px solid #78b6aa73;box-shadow:0 6px 25px #0005;border-radius:11px;backdrop-filter:blur(4px)}
+.status{padding:11px 14px;font-weight:800;min-width:195px;letter-spacing:.55px;font-size:12px}
+.status strong{color:#a3ffe0;font-size:15px}
+.hp{padding:11px 13px;max-width:255px}
+.hpRow{display:flex;align-items:center;justify-content:space-between;gap:13px;font-size:12px;font-weight:900}
+.hpTrack{background:#16363d;height:11px;border-radius:20px;margin-top:8px;overflow:hidden;box-shadow:inset 0 1px 4px #0009}
+.hpTrack>div{height:100%;width:100%;background:linear-gradient(90deg,#58dc83,#a2f6b6);border-radius:20px;transition:width .13s}
+.shield{font-size:11px;color:#afdcff;letter-spacing:.2px;margin-top:7px}
+#map{position:fixed;right:16px;top:13px;width:185px;height:115px;border:1px solid #9fc7ba91;background:#052132d9;border-radius:10px;box-shadow:0 9px 25px #0008;z-index:2}
+#help{position:fixed;left:14px;bottom:13px;max-width:600px;padding:10px 13px;line-height:1.6;pointer-events:none;color:#d8e7df;font-size:11px;z-index:2}
+#notice{position:fixed;left:50%;top:17px;transform:translateX(-50%);padding:10px 17px;font-weight:850;text-align:center;white-space:nowrap;letter-spacing:.5px;font-size:12px;pointer-events:none;z-index:3}
+#warning{position:fixed;inset:0;display:grid;place-items:center;z-index:8;background:#091823c9;pointer-events:none;text-align:center}
+#warning>div{background:#12384b;padding:25px;border-radius:18px;border:1px solid #6ae6c1;font-size:16px;max-width:360px;line-height:1.7}
+#warning strong{font-size:22px;color:#9dffe5}
+.controls{display:none;position:fixed;left:0;right:0;bottom:12px;justify-content:space-between;align-items:flex-end;padding:0 16px;pointer-events:none;z-index:5}
+.joystick{height:135px;width:135px;border:2px solid #d0ffe89e;border-radius:50%;background:#132f3d70;display:flex;align-items:center;justify-content:center;pointer-events:auto;touch-action:none}
+.stick{width:54px;height:54px;border:2px solid #ecfff9cf;border-radius:50%;background:#65edd79e;transform:translate(var(--dx,0px),var(--dy,0px));box-shadow:0 0 20px #64edb790}
+.rightControls{display:flex;align-items:flex-end;gap:12px;pointer-events:auto}
+.touchButton{font:900 13px system-ui;border:2px solid #d8ffea;border-radius:99px;touch-action:none;user-select:none;box-shadow:0 0 25px #0007}
+#fire{width:95px;height:95px;background:#f7b86d;color:#363024}
+#dash{width:68px;height:68px;background:#9af7d3;color:#284e55}
+@media(pointer:coarse){.controls{display:flex}#help{bottom:159px;font-size:10px;max-width:55%}}
+@media(max-width:600px){.hud{left:8px;top:8px;gap:5px}.status{min-width:120px;font-size:10px;padding:8px}.status strong{font-size:11px}.hp{max-width:155px;padding:8px}.hpRow{font-size:10px}#map{width:110px;height:70px;right:8px;top:8px}#notice{top:auto;bottom:166px;font-size:10px;padding:6px 9px}.joystick{width:111px;height:111px}#fire{width:77px;height:77px}#dash{width:55px;height:55px;font-size:11px}.controls{padding:0 11px}}
+@media(max-height:430px){#help{display:none}.controls{bottom:6px}.joystick{width:90px;height:90px}#fire{height:72px;width:72px}#dash{height:49px;width:49px}}
+</style></head><body>
+<canvas id="arena"></canvas><canvas id="map" width="370" height="230"></canvas>
+<div class="hud">
+ <div class="glass status"><span>🛡️ TANK SURVIVAL ONLINE</span><div><strong id="points">0</strong> PTS · <span id="ko">0</span> KOs</div></div>
+ <div class="glass hp"><div class="hpRow"><span>ARMOUR</span><span id="hp">100 / 100</span></div>
+ <div class="hpTrack"><div id="hpBar"></div></div><div id="power" class="shield">⬡ SHIELD 0 · DASH READY</div></div>
+</div>
+<div class="glass" id="notice">🗺️ SHARED WORLD · 4.2K × 2.6K</div>
+<div class="glass" id="help">WASD / ARROWS DRIVE · MOUSE AIM · HOLD CLICK / SPACE FIRE · SHIFT DASH
+ <div>Gold shells: players · Red shells: enemy tanks · Wooden covers respawn after 12s</div>
+</div>
+<div id="warning"><div><strong>CONNECTING TO ARENA</strong><div>Waiting for the shared game state...</div></div></div>
+<div class="controls">
+ <div id="joystick" class="joystick"><div class="stick" id="stick"></div></div>
+ <div class="rightControls"><button id="dash" class="touchButton">DASH</button><button id="fire" class="touchButton">FIRE</button></div>
+</div>
+<script>
+(function(){
+'use strict';
+const $=id=>document.getElementById(id);
+const c=$('arena'),g=c.getContext('2d',{alpha:false}),m=$('map'),mg=m.getContext('2d');
+const colors=['#62efdc','#ffc479','#aa8eff','#ff85a0','#87b3ff','#b7f28b','#ffdf81','#ff91ed'];
+let state=null,ownId=null,wasReady=false,latestStateAt=0,keys={},mouseDown=false,fireDown=false,dashDown=false;
+let joystick={x:0,y:0,active:false,pointer:-1},aimAngle=0,particles=[],seenFx=new Set(),smooth=new Map(),lastTime=0;
+let view={x:0,y:0,scale:1},size={w:0,h:0,dpr:1},lastInput=0,serverOffset=0;
+const trim=(v,a,b)=>Math.max(a,Math.min(b,v));
+const angleWrap=a=>Math.atan2(Math.sin(a),Math.cos(a));
+function sendParent(message){try{parent.postMessage(message,location.origin)}catch(e){}}
+function initCanvas(){
+ const rect=c.getBoundingClientRect();if(!rect.width||!rect.height)return;
+ const dpr=Math.min(1.5,window.devicePixelRatio||1);
+ if(Math.abs(rect.width-size.w)<1&&Math.abs(rect.height-size.h)<1&&dpr===size.dpr)return;
+ size={w:rect.width,h:rect.height,dpr};
+ c.width=Math.floor(rect.width*dpr);c.height=Math.floor(rect.height*dpr);
+}
+addEventListener('resize',initCanvas);initCanvas();
+addEventListener('message',e=>{
+ if(e.origin!==location.origin||e.source!==parent||e.data?.type!=='party-tank-state')return;
+ state=e.data.state;ownId=state.me;latestStateAt=Date.now();
+ serverOffset=Date.now()-(state.serverNow||Date.now());
+ $('warning').style.display='none';wasReady=true;
+ const player=mine();if(player){
+  $('hp').textContent=player.hp+' / 100';$('hpBar').style.width=player.hp+'%';
+  $('points').textContent=player.score;$('ko').textContent=player.kills;
+  const cd=Math.max(0,(player.dashAt-(Date.now()-serverOffset))/1000);
+  $('power').textContent='⬡ SHIELD '+player.shield+' · '+(cd?'DASH '+cd.toFixed(1)+'s':'DASH READY');
+ }
+ $('notice').textContent='⚡ WAVE '+(state.tank?.wave||1)+' · '+state.players.length+' ACTIVE TANKS · ONE SHARED WORLD';
+ for(const f of state.tank?.fx||[]){
+  if(seenFx.has(f.id))continue;
+  seenFx.add(f.id);
+  if(seenFx.size>500)seenFx=new Set([f.id]);
+  burst(f.x,f.y,f.type);
+ }
+});
+sendParent({type:'party-tank-ready'});
+setInterval(()=>{if(!wasReady)sendParent({type:'party-tank-ready'})},1400);
+function mine(){return state?.players?.find(p=>p.id===ownId)||null}
+function smoothPosition(p){
+ let val=smooth.get(p.id);
+ if(!val){val={x:p.x,y:p.y,a:p.a||0,bodyA:p.bodyA||0};smooth.set(p.id,val)}
+ val.x+=(p.x-val.x)*.24;val.y+=(p.y-val.y)*.24;
+ val.a+=angleWrap((p.a||0)-val.a)*.36;val.bodyA+=angleWrap((p.bodyA||0)-val.bodyA)*.25;
+ return val;
+}
+function toWorld(clientX,clientY){
+ const rect=c.getBoundingClientRect();
+ return {x:view.x+(clientX-rect.left)/view.scale,y:view.y+(clientY-rect.top)/view.scale};
+}
+function updateAim(e){
+ const p=mine();if(!p)return;
+ const pos=toWorld(e.clientX,e.clientY);
+ aimAngle=Math.atan2(pos.y-p.y,pos.x-p.x);
+}
+const gameKeys=new Set(['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright',' ','shift','e']);
+addEventListener('keydown',e=>{const k=e.key.toLowerCase();if(gameKeys.has(k)){e.preventDefault();keys[k]=true}});
+addEventListener('keyup',e=>{const k=e.key.toLowerCase();if(gameKeys.has(k)){e.preventDefault();keys[k]=false}});
+addEventListener('blur',()=>{keys={};mouseDown=false;fireDown=false;dashDown=false;joystick.x=0;joystick.y=0});
+c.addEventListener('pointermove',e=>{if(e.pointerType!=='touch')updateAim(e)});
+c.addEventListener('pointerdown',e=>{if(e.pointerType!=='touch'){updateAim(e);mouseDown=true;c.setPointerCapture(e.pointerId)}});
+c.addEventListener('pointerup',()=>mouseDown=false);c.addEventListener('pointercancel',()=>mouseDown=false);
+c.addEventListener('contextmenu',e=>e.preventDefault());
+const pad=$('joystick');
+function positionPad(e){
+ const r=pad.getBoundingClientRect(),x=e.clientX-r.left-r.width/2,y=e.clientY-r.top-r.height/2;
+ const magnitude=Math.hypot(x,y),limit=39;
+ joystick.x=magnitude>limit?x/magnitude:x/limit;joystick.y=magnitude>limit?y/magnitude:y/limit;
+ $('stick').style.setProperty('--dx',(joystick.x*limit)+'px');
+ $('stick').style.setProperty('--dy',(joystick.y*limit)+'px');
+}
+pad.addEventListener('pointerdown',e=>{e.preventDefault();pad.setPointerCapture(e.pointerId);joystick.active=true;joystick.pointer=e.pointerId;positionPad(e)});
+pad.addEventListener('pointermove',e=>{if(joystick.active&&e.pointerId===joystick.pointer){e.preventDefault();positionPad(e)}});
+function releaseStick(){joystick.active=false;joystick.x=0;joystick.y=0;$('stick').style.setProperty('--dx','0px');$('stick').style.setProperty('--dy','0px')}
+pad.addEventListener('pointerup',releaseStick);pad.addEventListener('pointercancel',releaseStick);
+function setHeld(node,callback){
+ node.addEventListener('pointerdown',e=>{e.preventDefault();node.setPointerCapture(e.pointerId);callback(true)});
+ node.addEventListener('pointerup',()=>callback(false));
+ node.addEventListener('pointercancel',()=>callback(false));
+}
+setHeld($('fire'),value=>fireDown=value);setHeld($('dash'),value=>dashDown=value);
+function makeInput(){
+ const dx=(Number(!!(keys.d||keys.arrowright))-Number(!!(keys.a||keys.arrowleft)))+joystick.x;
+ const dy=(Number(!!(keys.s||keys.arrowdown))-Number(!!(keys.w||keys.arrowup)))+joystick.y;
+ let a=aimAngle;
+ if(fireDown){
+  const me=mine(),enemies=[...(state?.tank?.mobs||[]),...(state?.players||[]).filter(p=>p.id!==ownId&&p.hp>0)];
+  if(me&&enemies.length){
+   enemies.sort((x,y)=>Math.hypot(me.x-x.x,me.y-x.y)-Math.hypot(me.x-y.x,me.y-y.y));
+   const closest=enemies[0];
+   if(Math.hypot(closest.x-me.x,closest.y-me.y)<1120)a=Math.atan2(closest.y-me.y,closest.x-me.x);
+  }
+ }
+ return {dx,dy,angle:a,fire:!!(mouseDown||fireDown||keys[' ']),dash:!!(dashDown||keys.shift||keys.e)};
+}
+setInterval(()=>{
+ if(!state||state.phase!=='playing'||state.isSpectator)return;
+ sendParent({type:'party-tank-input',input:makeInput()});
+},85);
+function roundRect(x,y,w,h,r,fill){g.fillStyle=fill;g.beginPath();g.roundRect(x,y,w,h,r);g.fill()}
+function line(x1,y1,x2,y2,col,width=2){g.strokeStyle=col;g.lineWidth=width;g.beginPath();g.moveTo(x1,y1);g.lineTo(x2,y2);g.stroke()}
+function disk(x,y,r,col){g.fillStyle=col;g.beginPath();g.arc(x,y,r,0,Math.PI*2);g.fill()}
+function burst(x,y,type){
+ const col=type==='ko'||type==='blast'?'#ffcb7f':type==='hit'?'#ff728b':type==='pickup'?'#74ffcb':type==='shield'?'#8de8ff':'#ffe5a3';
+ const count=type==='ko'?18:type==='blast'?23:8;
+ for(let i=0;i<count;i++){
+  const a=Math.random()*Math.PI*2,v=45+Math.random()*165;
+  particles.push({x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,col,life:.43+Math.random()*.22});
+ }
+ if(particles.length>250)particles.splice(0,particles.length-250);
+}
+function drawTerrain(t,world){
+ const w=world.w,h=world.h;
+ const color=g.createLinearGradient(0,0,0,h);
+ color.addColorStop(0,'#829f88');color.addColorStop(.6,'#658a78');color.addColorStop(1,'#4e7369');
+ g.fillStyle=color;g.fillRect(0,0,w,h);
+ // Draw only the visible terrain tiles; this avoids large-canvas overdraw.
+ const xmin=Math.max(0,Math.floor(view.x/110)*110-110),xmax=Math.min(w,view.x+size.w/view.scale+150);
+ const ymin=Math.max(0,Math.floor(view.y/110)*110-110),ymax=Math.min(h,view.y+size.h/view.scale+150);
+ for(let x=xmin;x<xmax;x+=110)for(let y=ymin;y<ymax;y+=110){
+  roundRect(x+2,y+2,105,105,3,((Math.floor(x/110)+Math.floor(y/110))%2)?'#ffffff08':'#00000009');
+  if((Math.floor(x/110)*3+Math.floor(y/110)*11)%5===0){
+   disk(x+34,y+44,15,'#4c76604c');disk(x+49,y+59,8,'#b3b98c36');
+  }
+ }
+ // Named outposts give players landmarks in the huge shared world.
+ for(const poi of [[620,460,'WEST CAMP'],[2030,700,'CENTRAL YARD'],[3550,450,'EAST FORT'],[600,2030,'SOUTH WEST'],[2090,2120,'SOUTH RIDGE'],[3550,2100,'EAST DEPOT']]){
+  g.fillStyle='#153c3980';g.beginPath();g.arc(poi[0],poi[1],150,0,Math.PI*2);g.fill();
+  g.strokeStyle='#d6efb345';g.lineWidth=3;g.stroke();
+  g.fillStyle='#e3fbdd88';g.font='bold 24px system-ui';g.textAlign='center';g.fillText(poi[2],poi[0],poi[1]);
+ }
+ g.strokeStyle='#dfffc885';g.lineWidth=13;g.strokeRect(8,8,w-16,h-16);
+}
+function drawCover(o){
+ const x=o.x,y=o.y,w=o.w,h=o.h;
+ roundRect(x+5,y+8,w,h,8,'#0004');
+ if(o.type==='crate'){
+  roundRect(x,y,w,h,6,'#ae7b49');g.strokeStyle='#f0c494';g.lineWidth=3;g.strokeRect(x+6,y+6,w-12,h-12);
+  line(x+6,y+6,x+w-6,y+h-6,'#754729',5);line(x+w-6,y+6,x+6,y+h-6,'#754729',5);
+ }else if(o.type==='barrel'){
+  roundRect(x,y,w,h,12,'#d76c56');roundRect(x+7,y+5,w-14,h-10,9,'#f2a065');
+  line(x+7,y+13,x+w-7,y+13,'#633a41',5);line(x+7,y+h-13,x+w-7,y+h-13,'#633a41',5);
+  disk(x+w/2,y+h/2,Math.min(w,h)*.16,'#ffe6b9');
+ }else if(o.type==='sandbag'){
+  for(let j=0;j<4;j++)roundRect(x+3+(j%2)*4,y+j*h/4,w-7,h/4-1,10,j%2?'#c7ac78':'#a79870');
+ }else{
+  roundRect(x,y,w,h,5,'#708a98');for(let j=11;j<h;j+=24)line(x+5,y+j,x+w-5,y+j,'#d5e6e9',2);
+  for(const xx of [x+9,x+w-9])for(const yy of [y+9,y+h-9])disk(xx,yy,4,'#264459');
+ }
+ if(o.hp<o.maxHp&&o.maxHp<900){
+  g.lineWidth=2;line(x+w*.24,y+h*.1,x+w*.49,y+h*.45,'#392f32b9',2);line(x+w*.49,y+h*.45,x+w*.34,y+h*.78,'#392f32b9',2);
+ }
+}
+function tank(x,y,hullAngle,turretAngle,col,kind,time){
+ const scale=kind==='heavy'?1.2:kind==='scout'?.83:1;
+ g.save();g.translate(x,y);g.scale(scale,scale);g.rotate(hullAngle);
+ disk(0,8,30,'#0004');
+ for(const k of [-1,1]){
+  roundRect(-27,k*13-8,55,17,6,'#172932');
+  for(let j=-20;j<22;j+=10)line(j,k*13-5,j+4,k*13+6,'#8aa19b',2);
+ }
+ const grad=g.createLinearGradient(-24,-18,25,21);grad.addColorStop(0,'#ffffff55');grad.addColorStop(.28,col);grad.addColorStop(1,'#24414d');
+ roundRect(-24,-16,48,33,7,grad);roundRect(-13,-10,25,22,6,'#284956');
+ if(kind==='heavy'){roundRect(-24,-10,10,20,3,'#f6d8ae');roundRect(14,-10,8,20,3,'#f6d8ae')}
+ if(kind==='scout'){disk(-15,-11,4,'#fff1a7');disk(15,-11,4,'#fff1a7')}
+ g.rotate(turretAngle-hullAngle);
+ line(0,0,39,0,'#183744',11);line(13,-2,43,-2,'#a1bdb8',3);
+ disk(0,0,12,'#4d7777');disk(0,0,5,'#ddf1e3');
+ g.restore();
+}
+function drawPlayer(p,time,me){
+ const pos=smoothPosition(p);
+ const dead=p.respawnAt>Date.now()-serverOffset;
+ if(dead)return;
+ if(p.id===me) {
+  g.strokeStyle='#f0fff1b5';g.lineWidth=2;g.beginPath();g.arc(pos.x,pos.y,40,0,Math.PI*2);g.stroke();
+ }
+ if(p.invUntil>Date.now()-serverOffset){
+  g.strokeStyle='#9effe188';g.lineWidth=2;g.beginPath();g.arc(pos.x,pos.y,43+Math.sin(time*12)*2,0,Math.PI*2);g.stroke();
+ }
+ tank(pos.x,pos.y,pos.bodyA,pos.a,colors[p.slot%colors.length],'standard',time);
+ g.textAlign='center';g.font='bold 17px system-ui';g.lineWidth=4;g.strokeStyle='#14313b';
+ const label=p.name+(p.id===me?' (YOU)':'');
+ g.strokeText(label,pos.x,pos.y-49);g.fillStyle='#fafff4';g.fillText(label,pos.x,pos.y-49);
+ roundRect(pos.x-30,pos.y+40,60,7,3,'#113b46');
+ roundRect(pos.x-30,pos.y+40,60*Math.max(0,p.hp)/100,7,3,p.hp>35?'#9af7ac':'#ff929a');
+}
+function drawMob(m,t){
+ const color=m.kind==='heavy'?'#c65279':m.kind==='scout'?'#efb278':'#ed7b75';
+ tank(m.x,m.y,m.a,m.a,color,m.kind,t);
+ if(m.maxHp>1){
+  roundRect(m.x-26,m.y-42,52,6,3,'#312b42');
+  roundRect(m.x-26,m.y-42,52*m.hp/m.maxHp,6,3,'#ffb4ac');
+ }
+}
+function drawProjectiles(world){
+ for(const b of world.bullets){
+  line(b.x-b.vx*.026,b.y-b.vy*.026,b.x,b.y,'#fff3b7',5);disk(b.x,b.y,5,'#ffe19d');
+ }
+ for(const b of world.enemyBullets){
+  line(b.x-b.vx*.023,b.y-b.vy*.023,b.x,b.y,'#ff8297',5);disk(b.x,b.y,6,'#ff727f');
+ }
+}
+function drawPickup(item,t){
+ const color=item.type==='heal'?'#83ffc6':item.type==='shield'?'#9fdfff':'#ffd79b';
+ const y=item.y+Math.sin(t*3+item.x)*3;
+ disk(item.x,y,20,'#12383d');disk(item.x,y,15,color);
+ g.fillStyle='#123a46';g.textAlign='center';g.font='900 22px system-ui';
+ g.fillText(item.type==='heal'?'+':item.type==='shield'?'⬡':'⚡',item.x,item.y+8);
+}
+function drawParticles(dt){
+ for(const p of particles){
+  p.x+=p.vx*dt;p.y+=p.vy*dt;p.vx*=.96;p.vy*=.96;p.life-=dt;
+  g.save();g.globalAlpha=trim(p.life/.65,0,1);disk(p.x,p.y,3,p.col);g.restore();
+ }
+ particles=particles.filter(p=>p.life>0);
+}
+function drawMap(world){
+ const w=m.width,h=m.height;
+ mg.setTransform(1,0,0,1,0,0);mg.fillStyle='#0c302f';mg.fillRect(0,0,w,h);
+ mg.scale(w/world.w,h/world.h);
+ mg.fillStyle='#9caa998c';
+ for(const o of world.obstacles)mg.fillRect(o.x,o.y,o.w,o.h);
+ for(const npc of world.mobs){mg.fillStyle='#e87378';mg.beginPath();mg.arc(npc.x,npc.y,28,0,6.28);mg.fill()}
+ for(const p of state.players){
+  mg.fillStyle=colors[p.slot%colors.length];mg.beginPath();mg.arc(p.x,p.y,p.id===ownId?48:35,0,6.28);mg.fill();
+ }
+ mg.strokeStyle='#d9fff9';mg.lineWidth=8;mg.strokeRect(view.x,view.y,size.w/view.scale,size.h/view.scale);
+}
+function draw(timestamp){
+ requestAnimationFrame(draw);
+ if(!size.w) initCanvas();
+ const dt=trim((timestamp-(lastTime||timestamp))/1000,.001,.06);lastTime=timestamp;
+ g.setTransform(size.dpr,0,0,size.dpr,0,0);
+ g.fillStyle='#294d45';g.fillRect(0,0,size.w,size.h);
+ if(!state?.tank)return;
+ const world=state.tank;
+ const target=mine()||state.players[0];
+ if(!target)return;
+ const pos=smoothPosition(target);
+ const wanted=Math.max(.52,Math.min(1.05,Math.min(size.w/1020,size.h/630)));
+ view.scale=wanted;
+ let idealX=trim(pos.x-size.w/(2*wanted),0,Math.max(0,world.w-size.w/wanted));
+ let idealY=trim(pos.y-size.h/(2*wanted),0,Math.max(0,world.h-size.h/wanted));
+ view.x+=(idealX-view.x)*.13;view.y+=(idealY-view.y)*.13;
+ g.save();g.scale(view.scale,view.scale);g.translate(-view.x,-view.y);
+ const time=timestamp/1000;
+ drawTerrain(time,world);
+ for(const o of world.obstacles){
+  if(o.x>view.x+size.w/view.scale+80||o.x+o.w<view.x-80||o.y>view.y+size.h/view.scale+80||o.y+o.h<view.y-80)continue;
+  drawCover(o);
+ }
+ for(const pick of world.pickups)drawPickup(pick,time);
+ drawProjectiles(world);
+ for(const npc of world.mobs)drawMob(npc,time);
+ for(const player of state.players)drawPlayer(player,time,ownId);
+ drawParticles(dt);
+ g.restore();
+ drawMap(world);
+ const me=mine();
+ if(me?.respawnAt&&me.respawnAt>Date.now()-serverOffset){
+  const remain=Math.ceil((me.respawnAt-(Date.now()-serverOffset))/1000);
+  g.textAlign='center';g.font='900 27px system-ui';g.fillStyle='#fff2dd';g.fillText('RESPAWNING IN '+Math.max(1,remain),size.w/2,size.h/2);
+ }
+ if(Date.now()-latestStateAt>5000){
+  $('warning').style.display='grid';$('warning').innerHTML='<div><strong>RECONNECTING...</strong><div>Waiting for the room server.</div></div>';
+ }else $('warning').style.display='none';
+}
+requestAnimationFrame(draw);
+})();
+</script>
+</body></html>
