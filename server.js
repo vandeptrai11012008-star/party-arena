@@ -4,7 +4,7 @@ const PORT=Number(process.env.PORT)||3000;
 const tankWorld=require('./tank-world');
 const W=1800,H=1080,ROUND_MS=150000;
 const GAMES={
- tank:{id:'tank',name:'Tank Survival',duration:150000,objective:'Original Explore & Earn Tank Survival HTML arena and local upgrades.'},
+ tank:{id:'tank',name:'Tank Survival Online',duration:300000,objective:'Live 2–8 player tank battles in one 4200×2600 map, with shared AI, destructible cover and PvP.'},
  fishing:{id:'fishing',name:'Fishing 3D',duration:120000,objective:'Catch fish from a boat in first person, using the original 3D lake.'},
  jumping:{id:'jumping',name:'Skybound Trials',duration:120000,objective:'Original Explore & Earn platform challenges, checkpoints and moving platforms.'},
  space:{id:'space',name:'Nebula Endless',duration:150000,objective:'Original Explore & Earn space exploration, regional bosses and endless progression.'}
