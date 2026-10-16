@@ -626,6 +626,8 @@ if(partySelected&&window.parent!==window){
  prepare();
  menu();
  startGame();
+ const idleButton=document.querySelector('[data-idle]');
+ if(idleButton){idleButton.disabled=true;idleButton.style.opacity='.45';idleButton.title='Choose Fishing 3D from the Party Arena lobby'}
  document.querySelectorAll('[data-mode]').forEach(btn=>{
   if(btn.dataset.mode!==partyModeId){
    btn.disabled=true;btn.style.opacity='.40';btn.style.cursor='not-allowed';
