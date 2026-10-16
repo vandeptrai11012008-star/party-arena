@@ -76,7 +76,7 @@ function syncClassic(){
  if(classicLoadedPath!==url){classicLoadedPath=url;$('classicFrame').src=url}
  if(s.gameId==='tank'&&s.tank){
   if(Array.isArray(s.tank.obstacles))tankMapCache=s.tank.obstacles;
-  try{$('classicFrame').contentWindow?.postMessage({type:'party-tank-state',state:s},location.origin)}catch(e){}
+  try{$('classicFrame').contentWindow?.postMessage({type:'party-tank-state',state:s,inputToken:token},location.origin)}catch(e){}
  }
  $('classicMode').textContent=(s.gameId==='tank'?'🛡️ ':s.gameId==='fishing'?'🎣 ':s.gameId==='jumping'?'☁️ ':'🚀 ')+(s.games.find(g=>g.id===s.gameId)?.name||s.gameId);
  $('classicRoom').textContent='ROOM '+s.code;
@@ -88,7 +88,7 @@ window.addEventListener('message',async e=>{
  if(e.data?.type==='party-tank-ready'&&s.gameId==='tank'){
   if(s.tank){
    const snapshot=s.tank.obstacles===null&&tankMapCache?{...s,tank:{...s.tank,obstacles:tankMapCache}}:s;
-   $('classicFrame').contentWindow?.postMessage({type:'party-tank-state',state:snapshot},location.origin);
+   $('classicFrame').contentWindow?.postMessage({type:'party-tank-state',state:snapshot,inputToken:token},location.origin);
   }
   return;
  }
