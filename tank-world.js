@@ -36,7 +36,7 @@ function obstaclePlace(w,players){
 }
 function create(r){
  const w={w:W,h:H,obstacles:[],bullets:[],enemyBullets:[],mobs:[],pickups:[],fx:[],wave:1,
-    spawnAt:0,addCoverAt:Date.now()+16000,extraCover:0,startedAt:0,serial:0};
+    spawnAt:0,addCoverAt:Date.now()+16000,extraCover:0,layoutVersion:1,startedAt:0,serial:0};
  for(const p of r.players){
   const pos=spawnPoints[p.slot%8];p.x=pos[0];p.y=pos[1];
   p.hp=100;p.shield=0;p.invUntil=Date.now()+2800;p.respawnAt=0;
@@ -105,7 +105,7 @@ function damageCover(w,o,b,t){
  o.hp--;
  effect(w,b.x,b.y,o.type==='barrel'?'smoke':'spark');
  if(o.hp<=0){
-  o.active=false;o.respawnAt=t+12000;
+  o.active=false;o.respawnAt=t+12000;w.layoutVersion++;
   effect(w,o.x+o.w/2,o.y+o.h/2,'blast');
   if(o.type==='barrel'){
    const x=o.x+o.w/2,y=o.y+o.h/2;
@@ -199,14 +199,14 @@ function updateWorldObjects(w,players,t,dt){
   if(players.some(p=>!p.respawnAt&&nearRect(p.x,p.y,40,{...o,active:true})))continue;
   if(w.mobs.some(m=>nearRect(m.x,m.y,30,{...o,active:true})))continue;
   if(w.obstacles.some(other=>other!==o&&other.active&&o.x<other.x+other.w+10&&o.x+o.w+10>other.x&&o.y<other.y+other.h+10&&o.y+o.h+10>other.y))continue;
-  o.active=true;o.hp=o.maxHp;o.respawnAt=0;
+  o.active=true;o.hp=o.maxHp;o.respawnAt=0;w.layoutVersion++;
   effect(w,o.x+o.w/2,o.y+o.h/2,'respawn');
  }
  if(t>=w.addCoverAt){
   w.addCoverAt=t+16000;
   if(w.extraCover<9){
    const o=obstaclePlace(w,players);
-   if(o&&o.type!=='steel'){w.obstacles.push(o);w.extraCover++;effect(w,o.x+o.w/2,o.y+o.h/2,'respawn')}
+   if(o&&o.type!=='steel'){w.obstacles.push(o);w.extraCover++;w.layoutVersion++;effect(w,o.x+o.w/2,o.y+o.h/2,'respawn')}
   }
  }
  for(const pick of w.pickups){
@@ -255,7 +255,7 @@ function tick(r,t,dt){
 }
 function view(r){
  const w=r.tank;if(!w)return null;
- return {w:W,h:H,wave:w.wave,
+ return {w:W,h:H,wave:w.wave,layoutVersion:w.layoutVersion,
    obstacles:w.obstacles.filter(o=>o.active).map(o=>({id:o.id,x:o.x,y:o.y,w:o.w,h:o.h,type:o.type,hp:o.hp,maxHp:o.maxHp})),
    bullets:w.bullets.map(b=>({x:Math.round(b.x),y:Math.round(b.y),vx:Math.round(b.vx),vy:Math.round(b.vy),owner:b.owner})),
    enemyBullets:w.enemyBullets.map(b=>({x:Math.round(b.x),y:Math.round(b.y),vx:Math.round(b.vx),vy:Math.round(b.vy)})),
