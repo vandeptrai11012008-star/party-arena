@@ -20,6 +20,23 @@ Four browser games share room codes, a host-controlled lobby, a timer and a live
 
 **Phone:** left joystick to move; FIRE (auto-aims at a nearby tank) and DASH buttons on the right.
 
+## Performance-first update
+
+Tank Online now uses several optimizations designed especially for Render Free and mobile browsers:
+
+- **Room-level snapshot serialization:** the Node server builds one shared snapshot per room and only adds each viewer's ID / host flags before sending.
+- **Static-map deltas:** the initial layout is sent once on join or rematch. Later 10-Hz updates omit the obstacle list unless cover is broken, respawns or new cover appears. Connected clients cache and restore the last full layout.
+- **Network backpressure:** slow SSE subscribers skip stale frames instead of accumulating an unlimited snapshot backlog.
+- **Adaptive 2D rendering:** lower pixel density for touch devices, viewport-only background drawing, nearby-object visibility culling, cached terrain gradient, minimap refreshed roughly six times per second and frame-time-aware tank/camera interpolation.
+- **Smooth projectiles:** visuals extrapolate between network snapshots; bullet collision and damage stay authoritative on the server.
+- **Input coalescing:** unchanged idle controls are sent less often, and during slow HTTP requests only the newest control input is retained for transmission.
+- **Inactive-room saving:** Tank simulation does not spend CPU on NPC movement when no browser is connected.
+- **Reconnect protection:** the parent lobby stores the initial map received during countdown, and new/returning players receive a full map even if the normal stream is using compact snapshots.
+
+### Verification and limits
+
+In an eight-client mocked-network test, one initial full game snapshot was about 9.3 KB and a routine compact update about 4.8 KB (~49% smaller). In a two-client fixture, updates fell from about 7.6 KB to 3.1 KB (~59% smaller). These are **sample payload measurements**, not internet speed or real-device FPS benchmarks. Functional checks also covered map revisions, late join, rematch, PvP and mobile script rendering. Actual gameplay smoothness still depends on device GPU, latency and Render CPU availability.
+
 ## The other three modes
 
 These **retain the original HTML gameplay on each player's device** and compete on shared room scores; they are **not yet shared-world multiplayer**.
