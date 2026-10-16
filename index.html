@@ -51,7 +51,7 @@ const safe=x=>String(x??'').replace(/[&<>"']/g,t=>({'&':'&amp;','<':'&lt;','>':'
 function alertText(txt){let e=$('toast');e.textContent=txt;e.style.display='block';clearTimeout(alertText.t);alertText.t=setTimeout(()=>e.style.display='none',2300)}
 async function api(endpoint,payload){const r=await fetch('/api/'+endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const o=await r.json();if(!r.ok)throw Error(o.error||'Request failed');return o}
 function display(where){for(const name of ['welcome','lobby','game'])$(name).classList.toggle('hidden',name!==where);view=where;resize()}
-function closeSession(){if(source){source.close();source=null}localStorage.removeItem('neonToken');token='';s=null;display('welcome')}
+function closeSession(){if(source){source.close();source=null}localStorage.removeItem('neonToken');token='';s=null;display('welcome');syncClassic()}
 function connect(){if(source)source.close();source=new EventSource('/events?token='+encodeURIComponent(token));source.onmessage=e=>{s=JSON.parse(e.data);offset=Date.now()-s.serverNow;sync()};source.onerror=()=>{if(source.readyState===EventSource.CLOSED)alertText('Reconnecting to game server...')}}
 function mine(){return s?.players.find(p=>p.id===s.me)}
 function now(){return Date.now()-offset}
