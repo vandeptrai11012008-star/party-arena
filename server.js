@@ -2,9 +2,10 @@
 const http=require('http'),fs=require('fs'),path=require('path'),crypto=require('crypto');
 const PORT=Number(process.env.PORT)||3000;
 const tankWorld=require('./tank-world');
+const MAX_PLAYERS=4;
 const W=1800,H=1080,ROUND_MS=150000;
 const GAMES={
- tank:{id:'tank',name:'Tank Survival Online',duration:300000,objective:'Live 2–8 player tank battles in one 4200×2600 map, with shared AI, destructible cover and PvP.'},
+ tank:{id:'tank',name:'Tank Survival Online',duration:300000,objective:'Live 2–4 player tank battles in one 4200×2600 map, with shared AI, destructible cover and PvP.'},
  fishing:{id:'fishing',name:'Fishing 3D',duration:120000,objective:'Catch fish from a boat in first person, using the original 3D lake.'},
  jumping:{id:'jumping',name:'Skybound Trials',duration:120000,objective:'Original Explore & Earn platform challenges, checkpoints and moving platforms.'},
  space:{id:'space',name:'Nebula Endless',duration:150000,objective:'Original Explore & Earn space exploration, regional bosses and endless progression.'}
@@ -72,8 +73,8 @@ function push(r){
  }
 }
 function createRoom(name){let code;do{code=newCode()}while(rooms.has(code));const p=makePlayer(name,0),r={code,players:[p],spectators:[],host:p.id,clients:new Map(),phase:'lobby',round:0,gameId:'tank',practice:false,endsAt:0,bullets:[],enemyBullets:[],obstacles:[],wave:1,mobSpawnAt:0,startedAt:0,tank:null,pickups:[],gems:[],zones:[],meteors:[],mobs:[],meteorTimer:0,scoreTimer:0,fx:[],champion:'',lastTick:now(),lastPush:0,activeAt:now()};rooms.set(code,r);sessions.set(p.token,code);return {r,p}}
-function nextSlot(r){const slots=new Set([...r.players,...r.spectators].map(p=>p.slot));for(let i=0;i<8;i++)if(!slots.has(i))return i;return 0}
-function toLobby(r){r.tank=null;r.phase='lobby';r.practice=false;r.round=0;r.endsAt=0;r.champion='';r.bullets=[];r.enemyBullets=[];r.obstacles=[];r.wave=1;r.mobSpawnAt=0;r.pickups=[];r.gems=[];r.zones=[];r.meteors=[];r.mobs=[];r.meteorTimer=0;r.scoreTimer=0;r.fx=[];r.players.push(...r.spectators.splice(0,8-r.players.length));for(const p of r.players)resetPlayer(p);push(r)}
+function nextSlot(r){const slots=new Set([...r.players,...r.spectators].map(p=>p.slot));for(let i=0;i<MAX_PLAYERS;i++)if(!slots.has(i))return i;return 0}
+function toLobby(r){r.tank=null;r.phase='lobby';r.practice=false;r.round=0;r.endsAt=0;r.champion='';r.bullets=[];r.enemyBullets=[];r.obstacles=[];r.wave=1;r.mobSpawnAt=0;r.pickups=[];r.gems=[];r.zones=[];r.meteors=[];r.mobs=[];r.meteorTimer=0;r.scoreTimer=0;r.fx=[];r.players.push(...r.spectators.splice(0,MAX_PLAYERS-r.players.length));for(const p of r.players)resetPlayer(p);push(r)}
 const PLATFORMS=[
  {x:0,y:945,w:255,h:135},{x:340,y:860,w:185,h:25},{x:615,y:780,w:195,h:25},
  {x:892,y:875,w:180,h:25},{x:1165,y:795,w:180,h:25},{x:1430,y:865,w:180,h:25},
@@ -96,7 +97,7 @@ function spawnAsteroid(){
 function start(r,practice=false){
  if(r.players.length<2&&!practice)fault('At least 2 players required. Use TEST SOLO to practice.');
  if(r.phase!=='lobby'&&r.phase!=='done')fault('Match already running.');
- r.players.push(...r.spectators.splice(0,8-r.players.length));
+ r.players.push(...r.spectators.splice(0,MAX_PLAYERS-r.players.length));
  for(const p of r.players)resetPlayer(p);
  r.practice=!!practice&&r.players.length===1;r.round++;r.phase='countdown';r.endsAt=now()+4000;
  r.bullets=[];r.enemyBullets=[];r.fx=[];r.champion='';r.gems=[];r.zones=[];r.meteors=[];r.mobs=[];
@@ -329,7 +330,7 @@ function api(req,res,body){
   let b=JSON.parse(body||'{}');if(!b||typeof b!=='object')fault('Invalid request');
   const route=new URL(req.url,'http://localhost').pathname;
   if(route==='/api/create'){const name=cleanName(b.name);if(!name)fault('Enter your nickname first');const {r,p}=createRoom(name);return json(res,200,{token:p.token,code:r.code})}
-  if(route==='/api/join'){const r=getRoom(b.code),name=cleanName(b.name);if(!name)fault('Enter your nickname first');if(r.players.length+r.spectators.length>=8)fault('Room full (8 players maximum)');const p=makePlayer(name,nextSlot(r));if(r.phase==='lobby')r.players.push(p);else if(r.gameId==='tank'&&r.tank&&(r.phase==='countdown'||r.phase==='playing')&&r.players.length<8){r.players.push(p);tankWorld.join(r,p)}else r.spectators.push(p);sessions.set(p.token,r.code);r.activeAt=now();push(r);return json(res,200,{token:p.token,code:r.code})}
+  if(route==='/api/join'){const r=getRoom(b.code),name=cleanName(b.name);if(!name)fault('Enter your nickname first');if(r.players.length+r.spectators.length>=MAX_PLAYERS)fault('Room full (4 players maximum)');const p=makePlayer(name,nextSlot(r));if(r.phase==='lobby')r.players.push(p);else if(r.gameId==='tank'&&r.tank&&(r.phase==='countdown'||r.phase==='playing')&&r.players.length<MAX_PLAYERS){r.players.push(p);tankWorld.join(r,p)}else r.spectators.push(p);sessions.set(p.token,r.code);r.activeAt=now();push(r);return json(res,200,{token:p.token,code:r.code})}
   const {r,p}=getAuth(b.token);r.activeAt=now();
   if(route==='/api/resume')return json(res,200,{ok:true});
   if(route==='/api/classic-score'){
