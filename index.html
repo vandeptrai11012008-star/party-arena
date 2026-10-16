@@ -127,8 +127,59 @@ async function input(){if(s?.phase!=='playing'||s.isSpectator||sending||s.gameId
 setInterval(input,80);
 function rounded(x,y,w,h,r){g.beginPath();g.roundRect(x,y,w,h,r)}
 function makeDust(f){let color=f.type==='pickup'?'#7affcc':f.type==='ko'?'#ffbd6c':f.type==='shield'?'#8adfff':f.type==='dash'?'#b58afa':'#ff7996';for(let i=0;i<15;i++){const a=Math.random()*6.28,v=70+Math.random()*220;dust.push({x:f.x,y:f.y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,color,life:.65})}if(dust.length>250)dust.splice(0,dust.length-250)}
+function tankRect(x,y,w,h,r,fill){
+ g.fillStyle=fill;rounded(x,y,w,h,r);g.fill();
+}
+function tankLine(x1,y1,x2,y2,color,width){
+ g.strokeStyle=color;g.lineWidth=width;g.beginPath();g.moveTo(x1,y1);g.lineTo(x2,y2);g.stroke();
+}
+function tankDot(x,y,r,color){
+ g.fillStyle=color;g.beginPath();g.arc(x,y,r,0,Math.PI*2);g.fill();
+}
+// The original Explore & Earn v21 Tank Survival battlefield: muted terrain,
+// tread-mark tiles, wooden crates, explosive barrels, sandbags and steel cover.
+function tankTerrain(t){
+ const w=s.arena.w,h=s.arena.h;
+ const bg=g.createLinearGradient(0,0,0,h);bg.addColorStop(0,'#799c86');bg.addColorStop(.48,'#658d7e');bg.addColorStop(1,'#4c7d71');
+ g.fillStyle=bg;g.fillRect(0,0,w,h);
+ for(let x=0;x<w;x+=100){
+  for(let y=0;y<h;y+=100){
+   tankRect(x+2,y+2,96,96,4,((Math.floor(x/100)+Math.floor(y/100))%2)?'#ffffff07':'#00000008');
+   if((Math.floor(x/100)*7+Math.floor(y/100)*11)%5===0){
+    tankDot(x+35,y+52,15,'#466c5040');tankDot(x+46,y+60,10,'#ffffff10');
+   }
+  }
+ }
+ for(let x=25;x<w;x+=320){
+  tankLine(x,30,x+120,30,'#dae8bc28',2);
+  tankLine(x,h-32,x+120,h-32,'#dae8bc28',2);
+ }
+ g.lineWidth=8;g.strokeStyle='#d7edcc60';g.strokeRect(9,9,w-18,h-18);
+ for(const o of s.arena.obstacles){
+  tankRect(o.x+7,o.y+8,o.w,o.h,8,'#0004');
+  if(o.type==='crate'){
+   tankRect(o.x,o.y,o.w,o.h,6,'#ab7749');
+   g.lineWidth=4;g.strokeStyle='#f0c494';g.strokeRect(o.x+6,o.y+6,o.w-12,o.h-12);
+   tankLine(o.x+7,o.y+7,o.x+o.w-7,o.y+o.h-7,'#704a2b',6);
+   tankLine(o.x+o.w-7,o.y+7,o.x+7,o.y+o.h-7,'#704a2b',6);
+   tankDot(o.x+12,o.y+12,3,'#fff3c7');tankDot(o.x+o.w-12,o.y+o.h-12,3,'#fff3c7');
+  }else if(o.type==='barrel'){
+   tankRect(o.x,o.y,o.w,o.h,13,'#d76f53');
+   tankRect(o.x+7,o.y+6,o.w-14,o.h-12,10,'#f39b63');
+   for(let j=0;j<3;j++)tankLine(o.x+9,o.y+9+j*(o.h-18)/2,o.x+o.w-9,o.y+9+j*(o.h-18)/2,'#623940',5);
+   tankDot(o.x+o.w/2,o.y+o.h/2,Math.min(13,o.w/6),'#ffe0a4');
+  }else if(o.type==='sandbag'){
+   for(let j=0;j<4;j++)tankRect(o.x+4+(j%2)*5,o.y+j*o.h/4,o.w-10,o.h/4-2,11,j%2?'#b9a778':'#928869');
+  }else if(o.type==='steel'){
+   tankRect(o.x,o.y,o.w,o.h,6,'#667f92');
+   for(let j=12;j<o.h;j+=26)tankLine(o.x+6,o.y+j,o.x+o.w-6,o.y+j,'#d1e4eb',2);
+   for(const xx of [o.x+9,o.x+o.w-9])for(const yy of [o.y+9,o.y+o.h-9])tankDot(xx,yy,4,'#213e51');
+  }else tankRect(o.x,o.y,o.w,o.h,6,'#889ba0');
+ }
+}
 function scenery(t){
  const w=s.arena.w,h=s.arena.h;
+ if(s.gameId==='tank'){tankTerrain(t);return;}
  if(s.gameId==='jumping'){
   const sky=g.createLinearGradient(0,0,0,h);sky.addColorStop(0,'#173a74');sky.addColorStop(.55,'#367ca7');sky.addColorStop(1,'#a0d6d7');
   g.fillStyle=sky;g.fillRect(0,0,w,h);
