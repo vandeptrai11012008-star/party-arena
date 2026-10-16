@@ -58,7 +58,7 @@ let joystick={x:0,y:0,active:false,pointer:-1},aimAngle=0,particles=[],seenFx=ne
 let view={x:0,y:0,scale:1},size={w:0,h:0,dpr:1},lastInput=0,serverOffset=0;
 const lowPower=!!(window.matchMedia?.('(pointer: coarse)')?.matches)||window.innerWidth<640;
 let cachedObstacles=null,lastPaintAt=0,lastMinimapAt=0,blend=.24,terrainGradient=null;
-let lastSentInput=null,lastInputEmit=0;
+let lastSentInput=null,lastInputEmit=0,sessionToken='',inputBusy=false,latestQueuedInput=null,estimatedRtt=130;
 const frameInterval=lowPower?23:13; // aim for 30-45 FPS on touch, up to 60 FPS on desktop
 function visible(x,y,pad=60){
  return x>=view.x-pad&&y>=view.y-pad&&x<=view.x+size.w/view.scale+pad&&y<=view.y+size.h/view.scale+pad;
@@ -77,6 +77,7 @@ addEventListener('resize',initCanvas);initCanvas();
 addEventListener('message',e=>{
  if(e.origin!==location.origin||e.source!==parent||e.data?.type!=='party-tank-state')return;
  const incoming=e.data.state;
+ if(e.data.inputToken&&typeof e.data.inputToken==='string')sessionToken=e.data.inputToken;
  if(incoming?.tank){
   if(Array.isArray(incoming.tank.obstacles))cachedObstacles=incoming.tank.obstacles;
   else if(cachedObstacles)incoming.tank.obstacles=cachedObstacles;
@@ -144,6 +145,31 @@ function setHeld(node,callback){
  node.addEventListener('pointercancel',()=>callback(false));
 }
 setHeld($('fire'),value=>fireDown=value);setHeld($('dash'),value=>dashDown=value);
+async function sendInputToServer(input){
+ if(!sessionToken){sendParent({type:'party-tank-input',input});return}
+ latestQueuedInput=input;
+ if(inputBusy)return;
+ inputBusy=true;
+ try{
+  while(latestQueuedInput&&state?.phase==='playing'){
+   const current=latestQueuedInput;latestQueuedInput=null;
+   const sentAt=performance.now();
+   try{
+    const response=await fetch('/api/input',{
+     method:'POST',headers:{'Content-Type':'application/json'},
+     body:JSON.stringify({token:sessionToken,input:current})
+    });
+    if(!response.ok)throw Error('Tank input request failed');
+    const rtt=performance.now()-sentAt;
+    estimatedRtt=estimatedRtt*.83+trim(rtt,5,700)*.17;
+   }catch(e){
+    // Compatibility fallback when direct input is temporarily unavailable.
+    sendParent({type:'party-tank-input',input:current});
+    break;
+   }
+  }
+ }finally{inputBusy=false}
+}
 function makeInput(){
  const dx=(Number(!!(keys.d||keys.arrowright))-Number(!!(keys.a||keys.arrowleft)))+joystick.x;
  const dy=(Number(!!(keys.s||keys.arrowdown))-Number(!!(keys.w||keys.arrowup)))+joystick.y;
@@ -167,7 +193,7 @@ setInterval(()=>{
  const heartbeat=active?125:340;
  if(!changed&&now-lastInputEmit<heartbeat)return;
  lastInputEmit=now;lastSentInput=next;
- sendParent({type:'party-tank-input',input:next});
+ sendInputToServer(next);
 },65);
 function roundRect(x,y,w,h,r,fill){g.fillStyle=fill;g.beginPath();g.roundRect(x,y,w,h,r);g.fill()}
 function line(x1,y1,x2,y2,col,width=2){g.strokeStyle=col;g.lineWidth=width;g.beginPath();g.moveTo(x1,y1);g.lineTo(x2,y2);g.stroke()}
