@@ -302,7 +302,7 @@ function api(req,res,body){
   let b=JSON.parse(body||'{}');if(!b||typeof b!=='object')fault('Invalid request');
   const route=new URL(req.url,'http://localhost').pathname;
   if(route==='/api/create'){const name=cleanName(b.name);if(!name)fault('Enter your nickname first');const {r,p}=createRoom(name);return json(res,200,{token:p.token,code:r.code})}
-  if(route==='/api/join'){const r=getRoom(b.code),name=cleanName(b.name);if(!name)fault('Enter your nickname first');if(r.players.length+r.spectators.length>=8)fault('Room full (8 players maximum)');const p=makePlayer(name,nextSlot(r));if(r.phase==='lobby')r.players.push(p);else r.spectators.push(p);sessions.set(p.token,r.code);r.activeAt=now();push(r);return json(res,200,{token:p.token,code:r.code})}
+  if(route==='/api/join'){const r=getRoom(b.code),name=cleanName(b.name);if(!name)fault('Enter your nickname first');if(r.players.length+r.spectators.length>=8)fault('Room full (8 players maximum)');const p=makePlayer(name,nextSlot(r));if(r.phase==='lobby')r.players.push(p);else if(r.gameId==='tank'&&r.tank&&(r.phase==='countdown'||r.phase==='playing')&&r.players.length<8){r.players.push(p);tankWorld.join(r,p)}else r.spectators.push(p);sessions.set(p.token,r.code);r.activeAt=now();push(r);return json(res,200,{token:p.token,code:r.code})}
   const {r,p}=getAuth(b.token);r.activeAt=now();
   if(route==='/api/resume')return json(res,200,{ok:true});
   if(route==='/api/classic-score'){
