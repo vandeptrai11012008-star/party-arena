@@ -1,44 +1,52 @@
-# Party Arena — Original HTML Worlds
+# Party Arena — Four Worlds
 
-Party Arena offers **four games with their original HTML interfaces**, one lobby, 2–8 room members, and a shared live score table.
+Four browser games share room codes, a host-controlled lobby, a timer and a live scoreboard. The **Tank Survival Online** mode now has a **real-time shared world** where players see and interact with one another.
 
-## Original sources preserved
+## Tank Survival Online — real-time multiplayer
 
-- **Tank Survival:** uses the original Tank Survival engine and visual layout from `Explore_and_Earn_Space_Evolution_Fixed_v21(2).html`. Standard and Heavy **red enemy tanks take 3 direct cannon hits** (orange Scout tanks take 1). Wooden crates and barrels take 2 hits, sandbags take 3; when destroyed, these covers regenerate **12 seconds later** if the spawn area is clear. New destructible crates/barrels appear about every **16 seconds** (capped at 9 added covers per match). Concrete and steel remain permanent.
-- **Skybound Trials (Jumping):** uses the original v21 platforms, controls, progression and visual scene.
-- **Nebula Endless (Space):** uses the original v21 space world, HUD, bosses and exploration.
-- **Fishing 3D:** uses the original first-person WebGL fishing HTML prototype supplied in this project, shown as a separate full-page game.
+- **One shared map:** 4,200 × 2,600 pixels. The server owns world position and state.
+- **2–8 players:** each drives a separate coloured tank, visible to everyone with their nickname, armour and position.
+- **Interaction:** battle other players (PvP), attack shared red/orange AI tanks (PvE), collide with other tanks and terrain, and pick up upgrades.
+- **Tank behaviour:** tracked body and independent turret visuals based on the original Explore & Earn v21 Tank model.
+- **Server-side authority:** driving, shells, collision, hit points, score, respawning, NPCs and destructible cover are all decided by the server, not by a player's browser.
+- **Enemy tanks:** Scouts require one direct hit; Standard/Heavy red AI tanks require three.
+- **Destructible obstacles:** wooden crates and barrels take two hits, sandbags take three, and regenerate **12 seconds** after destruction if the space is clear. Additional cover can appear every **16 seconds**, with a cap of 9 new obstacles per match. Steel supports one shell ricochet.
+- **Extras:** minimap, camera tracking, mobile joystick and buttons, ammo effects, 5 increasingly challenging waves, and a five-minute round.
+- **Join while playing:** new friends can join a running Tank match immediately when a room has an available player slot.
 
-Unlike earlier rough Canvas recreations, Tank / Jumping / Space open the source HTML in `classic.html?partyMode=tank|jumping|space`; Fishing opens `fishing.html`. The parent `index.html` keeps a compact header with the room code, timer, current scores and buttons to return to lobby or exit.
+### Tank controls
 
-## Multiplayer scope and limitations
+**Desktop:** WASD / arrow keys move; move the mouse to aim; hold left click or Space to fire; Shift or E to dash.
 
-Each person controls **their own instance of the original HTML game**. The shared room provides real-time score competition and a synchronized match timer, **not a synchronized game world** in which players' tanks/ships/characters see or interact with one another. This is a deliberate trade-off to retain the original interfaces and mechanics without rewriting each game engine. Local scores are browser-reported and rate-capped; they are **not tamper-proof competitive rankings**.
+**Phone:** left joystick to move; FIRE (auto-aims at a nearby tank) and DASH buttons on the right.
 
-Fishing catches are reported to the room for points. The original local unlocks, shop, progress and personal records remain local to that browser; they do not synchronize among players.
+## The other three modes
 
-## Playing online
+These **retain the original HTML gameplay on each player's device** and compete on shared room scores; they are **not yet shared-world multiplayer**.
 
-1. On the homepage, enter a name and create a room.
-2. Friends enter the same website and join using the six-character room code.
-3. Host selects **Tank**, **Fishing 3D**, **Jumping** or **Space** in the lobby.
-4. With at least two people, choose **START MATCH**, or choose **TEST SOLO** to practice alone.
-5. The selected original HTML interface opens automatically after the countdown. The shared room header includes the score, remaining time and **LOBBY** (host-only). **EXIT** leaves the room.
-6. The match ends after 120–150 seconds depending on game. The host can return everyone to lobby or start another game.
+- **Fishing 3D:** the original first-person WebGL lake, fishing rod and line-tension mechanic. Successful catches contribute room points.
+- **Skybound Trials (Jumping):** original v21 platform challenges, checkpoints and local progression.
+- **Nebula Endless (Space):** original v21 ship, space exploration, enemies, regional bosses and upgrades.
 
-Optional synthesized background music is off by default; tap **MUSIC ON** to hear it.
+## Getting started
 
-## Files
+1. Open the Party Arena website, enter your name and create a room.
+2. Share the six-character room code with friends. Other players join on their devices.
+3. Host selects **Tank Survival Online** and starts when at least two people have joined. **TEST SOLO** lets one person check controls and AI.
+4. In Tank mode, everyone fights on the **same map**. New players may join an active game.
+5. Host can choose **BACK TO LOBBY** or **PLAY AGAIN** to reset the world.
 
-- `server.js`: room codes, host authority, match clock, score collection, server events and static HTML routes.
-- `index.html`: lobby, mode selection, room header, score table, iframe transition.
-- `classic.html`: original Explore & Earn v21 (Tank Survival, Skybound Trials, Nebula Endless) with a small Party Arena score-message bridge.
-- `fishing.html`: original first-person 3D fishing WebGL page with a catch-message bridge.
+## Project files
 
-## Local run / Render
+- `server.js`: HTTP server, room membership, global timer and score state, server-sent events.
+- `tank-world.js`: authoritative shared-world multiplayer simulation (new).
+- `tank-shared.html`: scrolling Tank client inspired by the original tracked tank art, interpolated rendering at browser frame rate, joystick and minimap (new).
+- `index.html`: lobby, game selection, shared scoreboard, iframe game container and state relay.
+- `classic.html`: original Explore & Earn v21 HTML for Jumping and Space.
+- `fishing.html`: original first-person Fishing WebGL HTML.
 
-Node.js 18+: `node server.js`. Open http://localhost:3000. No third-party npm dependencies.
+Run with Node.js 18+ using `node server.js`, then visit http://localhost:3000. No extra npm dependencies are required. Render build command: `npm install`; start command: `node server.js`.
 
-Render Web Service: build `npm install`, start `node server.js`, branch `main`. Previously used public URL: https://party-arena-2.onrender.com/ .
+Previously used Render URL: https://party-arena-2.onrender.com/ . Deployment must reach **Live** before changes appear.
 
-Rooms and scores are stored in memory: they disappear if the free Render instance sleeps or restarts. Rendering quality depends on the browser and graphics acceleration.
+**Limitations:** Rooms live in process memory and vanish when the free Render server restarts or sleeps; the server is a single-instance prototype. Movement uses 20-Hz server simulation and 10-Hz snapshots with browser-side interpolation, and may exhibit latency depending on the internet connection. Fishing / Jumping / Space remain local gameplay with shared scores.
