@@ -107,7 +107,10 @@ function start(r,practice=false){
   r.gems=PLATFORMS.slice(1).map((pl,i)=>({x:pl.x+pl.w/2,y:pl.y-52,active:true,respawn:0}))
  }
  if(r.gameId==='space')for(let i=0;i<18;i++)r.meteors.push(spawnAsteroid());
- if(r.gameId==='tank')tankWorld.create(r);
+ if(r.gameId==='tank'){
+  tankWorld.create(r);
+  for(const client of r.clients.values())client._tankLayoutVersion=undefined;
+}
  push(r)
 }
 function newGem(i){
