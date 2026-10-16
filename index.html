@@ -56,7 +56,7 @@ function connect(){if(source)source.close();source=new EventSource('/events?toke
 function mine(){return s?.players.find(p=>p.id===s.me)}
 function now(){return Date.now()-offset}
 function clock(ms){let n=Math.max(0,Math.ceil(ms/1000));return Math.floor(n/60)+':'+String(n%60).padStart(2,'0')}
-let boardHash='',overlayPhase='',classicLoadedPath='',lastClassicScoreSent=0;
+let boardHash='',overlayPhase='',classicLoadedPath='',lastClassicScoreSent=0,tankInputBusy=false;
 function syncClassic(){
  const active=!!s&&s.phase==='playing'&&['tank','fishing','jumping','space'].includes(s.gameId);
  $('classicShell').classList.toggle('hidden',!active);
@@ -64,19 +64,34 @@ function syncClassic(){
   if(classicLoadedPath){classicLoadedPath='';$('classicFrame').src='about:blank'}
   return;
  }
- const url=s.gameId==='fishing'?'/fishing.html':'/classic.html?partyMode='+encodeURIComponent(s.gameId);
+ const url=s.gameId==='fishing'?'/fishing.html':s.gameId==='tank'?'/tank-shared.html':'/classic.html?partyMode='+encodeURIComponent(s.gameId);
  if(classicLoadedPath!==url){classicLoadedPath=url;$('classicFrame').src=url}
+ if(s.gameId==='tank'&&s.tank){
+  try{$('classicFrame').contentWindow?.postMessage({type:'party-tank-state',state:s},location.origin)}catch(e){}
+ }
  $('classicMode').textContent=(s.gameId==='tank'?'🛡️ ':s.gameId==='fishing'?'🎣 ':s.gameId==='jumping'?'☁️ ':'🚀 ')+(s.games.find(g=>g.id===s.gameId)?.name||s.gameId);
  $('classicRoom').textContent='ROOM '+s.code;
  $('classicBack').classList.toggle('hidden',!s.isHost);
  $('classicBoard').textContent=[...s.players].sort((a,b)=>b.score-a.score).slice(0,4).map((p,i)=>(i+1)+'. '+p.name+' '+p.score).join(' · ');
 }
 window.addEventListener('message',async e=>{
- if(e.origin!==location.origin||e.source!==$('classicFrame').contentWindow||!s||s.phase!=='playing'||s.isSpectator)return;
+ if(e.origin!==location.origin||e.source!==$('classicFrame').contentWindow||!s||s.phase!=='playing')return;
+ if(e.data?.type==='party-tank-ready'&&s.gameId==='tank'){
+  if(s.tank)$('classicFrame').contentWindow?.postMessage({type:'party-tank-state',state:s},location.origin);
+  return;
+ }
+ if(e.data?.type==='party-tank-input'&&s.gameId==='tank'&&!s.isSpectator){
+  if(tankInputBusy)return;
+  tankInputBusy=true;
+  try{await api('input',{token,input:e.data.input||{}})}catch(err){}
+  finally{tankInputBusy=false}
+  return;
+ }
+ if(s.isSpectator)return;
  if(e.data?.type==='party-fish-caught'&&s.gameId==='fishing'){
   try{let r=await api('fish',{token});alertText('🎣 +'+r.points+' points!')}catch(err){alertText(err.message)}
  }
- if(e.data?.type==='party-original-score'&&e.data.gameId===s.gameId&&s.gameId!=='fishing'){
+ if(e.data?.type==='party-original-score'&&e.data.gameId===s.gameId&&['jumping','space'].includes(s.gameId)){
   if(!Number.isFinite(Number(e.data.points)))return;
   let t=Date.now();if(!e.data.complete&&t-lastClassicScoreSent<750)return;lastClassicScoreSent=t;
   try{await api('classic-score',{token,points:Number(e.data.points)})}catch(err){}
@@ -93,7 +108,7 @@ function gameInfo(){return s?.games?.find(g=>g.id===s.gameId)||{id:'tank',name:'
 function drawLobby(){$('lobbyCode').textContent=s.code;$('lobbyCount').textContent=s.players.length+' / 8 PLAYERS';$('start').classList.toggle('hidden',!s.isHost);$('start').disabled=s.players.length<2;$('practice').classList.toggle('hidden',!s.isHost||s.players.length!==1);$('hostHint').textContent=s.isHost?(s.players.length<2?'Waiting for one more player...':'Ready! Press START MATCH.'): 'Waiting for host to start...';$('roster').innerHTML=Array.from({length:8},(_,i)=>{const p=s.players.find(x=>x.slot===i);return p?'<div class="slot '+(p.online?'':'offline')+'"><div class="avatar" style="color:'+C[p.slot]+'">✦</div><b>'+safe(p.name)+(p.id===s.me?' (YOU)':'')+'</b><small>'+(p.id===s.host?'👑 HOST':p.online?'● READY':'○ OFFLINE')+'</small></div>':'<div class="slot empty"><div class="avatar">+</div><small>OPEN SLOT</small></div>'}).join('');
  $('lobbyMode').textContent=(GAME_ICONS[s.gameId]||'🎮')+' '+gameInfo().name.toUpperCase();
  $('lobbyDuration').textContent=Math.round(gameInfo().duration/1000)+' SECOND MATCH';
- const labels={tank:'Drive and battle',fishing:'First-person 3D lake',jumping:'Platforms and stars',space:'Explore and shoot'};
+ const labels={tank:'LIVE 2–8 tank battlefield',fishing:'First-person 3D lake',jumping:'Platforms and stars',space:'Explore and shoot'};
  $('modeCards').innerHTML=(s.games||[]).map(g=>'<button type="button" class="modeCard '+(s.gameId===g.id?'selected':'')+'" data-game="'+safe(g.id)+'" '+(s.isHost?'':'disabled')+'><span class="modeIcon">'+(GAME_ICONS[g.id]||'🎮')+'</span><span class="modeName">'+safe(g.name)+'</span><span class="modeDetails">'+safe(labels[g.id]||g.objective)+'</span><span class="modeLength">'+Math.round(g.duration/1000)+'s · '+(s.gameId===g.id?'✓ READY':'SELECT')+'</span></button>').join('');
 }
 let selecting=false;
@@ -176,7 +191,7 @@ c.addEventListener('pointermove',e=>{if(e.pointerType!=='touch')aimMouse(e)});c.
 const pad=$('pad');let padId=null;function movePad(e){let r=pad.getBoundingClientRect(),x=e.clientX-r.left-r.width/2,y=e.clientY-r.top-r.height/2,v=Math.hypot(x,y),m=40;padVector={x:v>m?x/v:x/m,y:v>m?y/v:y/m};pad.style.setProperty('--x',padVector.x*m+'px');pad.style.setProperty('--y',padVector.y*m+'px')}
 pad.addEventListener('pointerdown',e=>{e.preventDefault();padId=e.pointerId;pad.setPointerCapture(e.pointerId);movePad(e)});pad.addEventListener('pointermove',e=>{if(e.pointerId===padId)movePad(e)});function padEnd(){padId=null;padVector={x:0,y:0};pad.style.setProperty('--x','0px');pad.style.setProperty('--y','0px')}pad.addEventListener('pointerup',padEnd);pad.addEventListener('pointercancel',padEnd);
 const fire=$('fire'),dash=$('dash');fire.addEventListener('pointerdown',e=>{e.preventDefault();touchFire=true;fire.setPointerCapture(e.pointerId)});fire.addEventListener('pointerup',()=>touchFire=false);fire.addEventListener('pointercancel',()=>touchFire=false);dash.addEventListener('pointerdown',e=>{e.preventDefault();touchDash=true;dash.setPointerCapture(e.pointerId)});dash.addEventListener('pointerup',()=>touchDash=false);dash.addEventListener('pointercancel',()=>touchDash=false);
-async function input(){if(s?.phase!=='playing'||s.isSpectator||sending||s.gameId==='fishing')return;let dx=Number(!!(key.d||key.arrowright))-Number(!!(key.a||key.arrowleft))+padVector.x,dy=Number(!!(key.s||key.arrowdown))-Number(!!(key.w||key.arrowup))+padVector.y,a=angle;if(touchFire){
+async function input(){if(s?.phase!=='playing'||s.isSpectator||sending||s.gameId==='fishing'||s.gameId==='tank')return;let dx=Number(!!(key.d||key.arrowright))-Number(!!(key.a||key.arrowleft))+padVector.x,dy=Number(!!(key.s||key.arrowdown))-Number(!!(key.w||key.arrowup))+padVector.y,a=angle;if(touchFire){
  const p=mine();
  if(p){
   const targets=[...s.players.filter(x=>x.id!==p.id&&!x.respawnAt),
