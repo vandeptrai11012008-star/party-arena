@@ -28,7 +28,7 @@ function obstaclePlace(w,players){
   const o={id:serial++,x,y,w:size,h:type==='steel'?90:size,type,
     hp:type==='steel'?999:type==='sandbag'?3:2,maxHp:type==='steel'?999:type==='sandbag'?3:2,
     active:true,respawnAt:0};
-  if(w.obstacles.some(other=>other.active&&x<other.x+other.w+35&&x+o.w+35>other.x&&y<other.y+other.h+35&&y+o.h+35>other.y))continue;
+  if(w.obstacles.some(other=>x<other.x+other.w+35&&x+o.w+35>other.x&&y<other.y+other.h+35&&y+o.h+35>other.y))continue;
   if(players.some(p=>Math.abs(p.x-x)<220&&Math.abs(p.y-y)<210))continue;
   return o;
  }
@@ -198,6 +198,7 @@ function updateWorldObjects(w,players,t,dt){
   if(o.active||!o.respawnAt||t<o.respawnAt)continue;
   if(players.some(p=>!p.respawnAt&&nearRect(p.x,p.y,40,{...o,active:true})))continue;
   if(w.mobs.some(m=>nearRect(m.x,m.y,30,{...o,active:true})))continue;
+  if(w.obstacles.some(other=>other!==o&&other.active&&o.x<other.x+other.w+10&&o.x+o.w+10>other.x&&o.y<other.y+other.h+10&&o.y+o.h+10>other.y))continue;
   o.active=true;o.hp=o.maxHp;o.respawnAt=0;
   effect(w,o.x+o.w/2,o.y+o.h/2,'respawn');
  }
@@ -241,7 +242,11 @@ function tick(r,t,dt){
   p.dashHeld=!!input.dash;
   let speed=p.speedUntil>t?285:205;
   if(p.tankDashUntil>t)speed*=2.6;
+  const oldX=p.x,oldY=p.y;
   moveEntity(w,p,dx*speed*dt,dy*speed*dt,26);
+  const tankOverlap=r.players.some(q=>q.id!==p.id&&!q.respawnAt&&len(q.x-p.x,q.y-p.y)<49);
+  const enemyOverlap=w.mobs.some(m=>m.hp>0&&len(m.x-p.x,m.y-p.y)<47);
+  if(tankOverlap||enemyOverlap){p.x=oldX;p.y=oldY}
   if(input.fire)firePlayer(w,p,t);
  }
  advanceShells(w,r.players,t,dt);
