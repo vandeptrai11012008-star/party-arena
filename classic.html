@@ -544,7 +544,8 @@ function drawTank(t){const s=state;sky(["#799c86","#b9a88f","#8499a8","#576c6b",
  if(s.invuln<=0||Math.floor(t*12)%2===0)tankShape(s.tank.x,s.tank.y,Number.isFinite(s.aim)?s.aim:s.tank.a,skinColor(),"standard",t);
  drawParticles();c.restore();
  roundRect(12,12,330,39,9,"#09253ba4");drawTag(23,36,`♾ SURVIVAL  ${formatClock(elapsed)}  ·  ${score} KO  ·  HP ${s.hp}/${s.maxHp}`,"#c8fff0");
- roundRect(743,12,204,39,9,"#09253bc2");drawTag(752,36,`${currentSurvivalPoints()} PTS  ·  WAVE ${1+Math.floor(elapsed/30)}`,"#ffdfb0")
+ roundRect(743,12,204,39,9,"#09253bc2");drawTag(752,36,`${currentSurvivalPoints()} PTS  ·  WAVE ${1+Math.floor(elapsed/30)}`,"#ffdfb0");
+ roundRect(12,56,369,28,7,"#09253b9f");drawTag(21,76,"RED TANKS: 3 HITS  ·  COVER REBUILDS IN 12s","#e9fbd7")
 }
 function drawJump(t){const st=state,cam=st.camera;
  const skies=[["#53a3d8","#c4f4fb"],["#f69e83","#fbd8b4"],["#776bd2","#e3bdeb"],["#1c436d","#6fa7b5"],["#29284c","#826188"]];
