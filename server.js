@@ -47,9 +47,28 @@ function stateFor(r,token){
  };
 }
 function push(r){
+ if(!r.clients.size)return;
+ // Build and serialize the shared world once, not once per connected player.
+ const sample=stateFor(r,r.clients.keys().next().value);
+ const {me,isHost,isSpectator,...shared}=sample;
+ const full=JSON.stringify(shared).slice(0,-1);
+ // Tank cover rarely changes; send the full obstacle list only to clients
+ // whose latest known layout revision differs from the authoritative map.
+ const inTank=r.gameId==='tank'&&r.tank&&shared.tank;
+ const compact=inTank?JSON.stringify({...shared,tank:{...shared.tank,obstacles:null}}).slice(0,-1):null;
+ const players=new Map([...r.players,...r.spectators].map(p=>[p.token,p]));
  for(const [token,res] of r.clients){
-  try{res.write('data: '+JSON.stringify(stateFor(r,token))+'\n\n')}
-  catch{r.clients.delete(token)}
+  const p=players.get(token);
+  if(!p||res.destroyed||res.writableEnded){r.clients.delete(token);continue}
+  // Skip stale snapshots instead of filling a slow browser's network buffer.
+  if((res.writableLength||0)>160000)continue;
+  const needsLayout=!!compact&&res._tankLayoutVersion!==r.tank.layoutVersion;
+  const base=compact&&!needsLayout?compact:full;
+  const payload=base+',"me":'+JSON.stringify(p.id)+',"isHost":'+(p.id===r.host)+',"isSpectator":'+(!r.players.includes(p))+'}';
+  try{
+   res.write('data: '+payload+'\n\n');
+   if(needsLayout)res._tankLayoutVersion=r.tank.layoutVersion;
+  }catch{r.clients.delete(token)}
  }
 }
 function createRoom(name){let code;do{code=newCode()}while(rooms.has(code));const p=makePlayer(name,0),r={code,players:[p],spectators:[],host:p.id,clients:new Map(),phase:'lobby',round:0,gameId:'tank',practice:false,endsAt:0,bullets:[],enemyBullets:[],obstacles:[],wave:1,mobSpawnAt:0,startedAt:0,tank:null,pickups:[],gems:[],zones:[],meteors:[],mobs:[],meteorTimer:0,scoreTimer:0,fx:[],champion:'',lastTick:now(),lastPush:0,activeAt:now()};rooms.set(code,r);sessions.set(p.token,code);return {r,p}}
