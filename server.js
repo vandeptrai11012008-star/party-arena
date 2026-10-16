@@ -28,7 +28,7 @@ function getRoom(code){const r=rooms.get(String(code||'').trim().toUpperCase());
 function getAuth(token){const c=sessions.get(String(token||''));if(!c)fault('Session expired. Please create or join a room.',401);const r=getRoom(c),p=[...r.players,...r.spectators].find(p=>p.token===token);if(!p)fault('Player no longer in this room.',401);return {r,p}}
 function cleanName(n){return String(n||'').trim().replace(/[<>]/g,'').slice(0,18)}
 function makePlayer(name,slot){return {id:uuid(),token:uuid(),name,slot,score:0,kills:0,deaths:0,x:SPAWNS[slot][0],y:SPAWNS[slot][1],angle:0,bodyAngle:0,hp:100,shield:0,speedUntil:0,invUntil:0,respawnAt:0,online:false,fireAt:0,dashAt:0,dashHeld:false,input:{dx:0,dy:0,angle:0,fire:false,dash:false},lastInput:0}}
-function resetPlayer(p){const xy=SPAWNS[p.slot%SPAWNS.length];p.vy=0;p.grounded=false;p.jumpHeld=false;p.lapCooldown=0;p.lastCatch=0;p.fishClaims=0;p.x=xy[0];p.y=xy[1];p.angle=0;p.bodyAngle=0;p.hp=100;p.shield=0;p.speedUntil=0;p.invUntil=now()+2000;p.respawnAt=0;p.fireAt=0;p.dashAt=0;p.dashHeld=false;p.score=0;p.kills=0;p.deaths=0;p.input={dx:0,dy:0,angle:0,fire:false,dash:false};p.lastInput=now()}
+function resetPlayer(p){const xy=SPAWNS[p.slot%SPAWNS.length];p.vy=0;p.grounded=false;p.jumpHeld=false;p.lapCooldown=0;p.lastCatch=0;p.fishClaims=0;p.lastClassicReport=0;p.x=xy[0];p.y=xy[1];p.angle=0;p.bodyAngle=0;p.hp=100;p.shield=0;p.speedUntil=0;p.invUntil=now()+2000;p.respawnAt=0;p.fireAt=0;p.dashAt=0;p.dashHeld=false;p.score=0;p.kills=0;p.deaths=0;p.input={dx:0,dy:0,angle:0,fire:false,dash:false};p.lastInput=now()}
 function playerView(p){return {id:p.id,name:p.name,slot:p.slot,x:Math.round(p.x),y:Math.round(p.y),a:p.angle,bodyA:p.bodyAngle,hp:p.hp,shield:p.shield,score:p.score,kills:p.kills,deaths:p.deaths,online:p.online,respawnAt:p.respawnAt,invUntil:p.invUntil,speedUntil:p.speedUntil,dashAt:p.dashAt,vy:p.vy,grounded:p.grounded,fishClaims:p.fishClaims}}
 function stateFor(r,token){
  const p=[...r.players,...r.spectators].find(x=>x.token===token);
@@ -217,7 +217,9 @@ function updateRoom(r,t,dt){
  if(r.phase==='countdown'){if(t>=r.endsAt){r.phase='playing';r.startedAt=t;r.endsAt=t+(GAMES[r.gameId]?.duration||ROUND_MS);push(r)}return}
  if(r.phase!=='playing')return;
  if(t>=r.endsAt){endGame(r);return}
- if(r.gameId==='fishing')return;
+ // Source-faithful HTML engines run inside each player's browser.
+ // The server controls the common match clock and leaderboard.
+ if(['tank','fishing','jumping','space'].includes(r.gameId))return;
  if(r.gameId==='jumping'){tickJumping(r,t,dt);return}
  for(const p of r.players){
   if(p.respawnAt){if(t>=p.respawnAt)respawn(p,t);else continue}
@@ -301,6 +303,21 @@ function api(req,res,body){
   if(route==='/api/join'){const r=getRoom(b.code),name=cleanName(b.name);if(!name)fault('Enter your nickname first');if(r.players.length+r.spectators.length>=8)fault('Room full (8 players maximum)');const p=makePlayer(name,nextSlot(r));if(r.phase==='lobby')r.players.push(p);else r.spectators.push(p);sessions.set(p.token,r.code);r.activeAt=now();push(r);return json(res,200,{token:p.token,code:r.code})}
   const {r,p}=getAuth(b.token);r.activeAt=now();
   if(route==='/api/resume')return json(res,200,{ok:true});
+  if(route==='/api/classic-score'){
+   if(r.phase!=='playing'||r.gameId==='fishing'||!['tank','jumping','space'].includes(r.gameId)||!r.players.includes(p))
+    fault('No classic HTML score submission available.');
+   const value=Number(b.points);
+   if(!Number.isFinite(value)||value<0)fault('Invalid score');
+   const t=now();
+   if(t-(p.lastClassicReport||0)<650)return json(res,200,{ok:true,score:p.score});
+   p.lastClassicReport=t;
+   // Cap client-reported local scores to prevent unlimited points from a
+   // malformed browser. The original games remain client-simulated.
+   const maxScore=Math.min(16000,Math.floor((t-(r.startedAt||t))/1000)*160+160);
+   const safePoints=clamp(Math.floor(value),0,maxScore);
+   if(safePoints>p.score){p.score=safePoints;push(r)}
+   return json(res,200,{ok:true,score:p.score});
+  }
   if(route==='/api/fish'){
    if(r.phase!=='playing'||r.gameId!=='fishing'||!r.players.includes(p))fault('Fishing round not active.');
    const t=now();if(t-p.lastCatch<6000)fault('Wait before catching another fish.');
@@ -354,8 +371,8 @@ const server=http.createServer((req,res)=>{
   let body='';req.on('data',chunk=>{body+=chunk;if(body.length>5000)req.destroy()});
   req.on('end',()=>api(req,res,body));return;
  }
- if(req.method==='GET'&&(route==='/'||route==='/index.html'||route==='/fishing.html')){
-  const file=path.join(__dirname,route==='/fishing.html'?'fishing.html':'index.html');
+ if(req.method==='GET'&&(route==='/'||route==='/index.html'||route==='/fishing.html'||route==='/classic.html')){
+  const file=path.join(__dirname,route==='/fishing.html'?'fishing.html':route==='/classic.html'?'classic.html':'index.html');
   fs.readFile(file,(err,data)=>{
    if(err)return json(res,404,{error:'Game client missing'});
    res.writeHead(200,{'Content-Type':mime['.html'],'Cache-Control':'no-store'});res.end(data);
