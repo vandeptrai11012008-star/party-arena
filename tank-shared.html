@@ -275,13 +275,18 @@ function drawMob(m,t){
  }
 }
 function drawProjectiles(world){
+ // Render shells between 10Hz server updates at local browser frame rate.
+ // The server remains authoritative for every hit and collision.
+ const lead=trim((Date.now()-latestStateAt)/1000,0,.105);
  for(const b of world.bullets){
-  if(!visible(b.x,b.y,75))continue;
-  line(b.x-b.vx*.026,b.y-b.vy*.026,b.x,b.y,'#fff3b7',5);disk(b.x,b.y,5,'#ffe19d');
+  const x=b.x+b.vx*lead,y=b.y+b.vy*lead;
+  if(!visible(x,y,75))continue;
+  line(x-b.vx*.026,y-b.vy*.026,x,y,'#fff3b7',5);disk(x,y,5,'#ffe19d');
  }
  for(const b of world.enemyBullets){
-  if(!visible(b.x,b.y,75))continue;
-  line(b.x-b.vx*.023,b.y-b.vy*.023,b.x,b.y,'#ff8297',5);disk(b.x,b.y,6,'#ff727f');
+  const x=b.x+b.vx*lead,y=b.y+b.vy*lead;
+  if(!visible(x,y,75))continue;
+  line(x-b.vx*.023,y-b.vy*.023,x,y,'#ff8297',5);disk(x,y,6,'#ff727f');
  }
 }
 function drawPickup(item,t){
