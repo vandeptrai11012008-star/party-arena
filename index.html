@@ -207,13 +207,43 @@ function scenery(t){
   g.globalAlpha=1;g.strokeStyle='#7999ff39';g.lineWidth=5;g.strokeRect(8,8,w-16,h-16);return;
  }
  let bg=g.createRadialGradient(900,540,30,900,540,950);bg.addColorStop(0,'#1a3755');bg.addColorStop(1,'#071528');g.fillStyle=bg;g.fillRect(0,0,w,h);g.strokeStyle='#508ca52d';g.lineWidth=1;g.beginPath();for(let x=0;x<w;x+=60){g.moveTo(x,0);g.lineTo(x,h)}for(let y=0;y<h;y+=60){g.moveTo(0,y);g.lineTo(w,y)}g.stroke();g.save();g.translate(900,540);g.rotate(.25);for(let r=140;r<=360;r+=105){g.strokeStyle='rgba(104,230,215,'+(.08+.03*Math.sin(t*2+r))+')';g.lineWidth=6;g.beginPath();g.arc(0,0,r,0,6.283);g.stroke()}g.restore();g.strokeStyle='#62e6ea88';g.lineWidth=7;g.shadowColor='#74d9ed';g.shadowBlur=15;g.strokeRect(8,8,w-16,h-16);g.shadowBlur=0;for(const o of s.arena.obstacles){let gr=g.createLinearGradient(o.x,o.y,o.x,o.y+o.h);gr.addColorStop(0,'#355a76');gr.addColorStop(1,'#132d49');g.fillStyle=gr;rounded(o.x,o.y,o.w,o.h,12);g.fill();g.strokeStyle='#6bbebd95';g.lineWidth=3;g.stroke();g.fillStyle='#b9ffec10';rounded(o.x+10,o.y+10,o.w-20,o.h-20,5);g.fill()}}
+// Adapted from the original Tank Survival tankShape in Explore & Earn v21.
+// Body, segmented caterpillar tracks, armoured cabin and independently-aimed turret.
+function tankSprite(x,y,hullA,turretA,color,kind='standard',t=0){
+ g.save();g.translate(x,y);
+ const sc=kind==='heavy'?1.22:kind==='scout'?.84:1;
+ g.scale(sc,sc);
+ g.rotate(hullA);
+ g.fillStyle='#0005';g.beginPath();g.ellipse(3,7,31,23,0,0,Math.PI*2);g.fill();
+ for(const k of [-1,1]){
+  tankRect(-26,k*13-8,53,17,6,'#172932');
+  for(let j=-18;j<20;j+=10)tankLine(j,k*13-5,j+3,k*13+5,'#6f8b86',2);
+ }
+ const metal=g.createLinearGradient(-23,-18,25,22);
+ metal.addColorStop(0,'#ffffff60');metal.addColorStop(.27,color);metal.addColorStop(1,'#223e48');
+ tankRect(-23,-15,46,30,7,metal);
+ tankRect(-12,-11,24,22,7,'#254655');
+ if(kind==='heavy'){
+  tankRect(-24,-10,10,20,3,'#dbe9b2');tankRect(12,-10,9,20,3,'#dbe9b2');
+ }
+ if(kind==='scout'){tankDot(-15,-11,4,'#fff1a7');tankDot(15,-11,4,'#fff1a7')}
+ g.rotate(turretA-hullA);
+ // Cannon, barrel shine and turret rotate together. Recoil is subtle.
+ const recoil=.9*Math.max(0,Math.sin(t*3.1));
+ tankLine(0,0,37-recoil,0,'#183744',11);
+ tankLine(13,-2,41-recoil,-2,'#94b0af',3);
+ tankDot(0,0,12,'#4b7476');tankDot(0,0,5,'#d7ebdd');
+ g.restore();
+}
 function modeDecor(t){
  if(s.gameId==='tank'){
   for(const m of s.mobs||[]){
-   g.save();g.translate(m.x,m.y);g.rotate(t*.3+m.x*.002);
-   g.fillStyle='#512944';g.strokeStyle='#ffae82';g.lineWidth=3;
-   rounded(-25,-20,50,40,9);g.fill();g.stroke();
-   g.fillStyle='#ffb68e';g.fillRect(-13,-5,26,10);g.restore();
+   const enemyColor=m.kind==='scout'?'#f3b068':m.kind==='heavy'?'#c45275':'#ee776e';
+   tankSprite(m.x,m.y,m.a??0,m.a??0,enemyColor,m.kind||'standard',t);
+   if(m.maxHp>1){
+    tankRect(m.x-24,m.y-40,48,6,3,'#2a334a');
+    tankRect(m.x-24,m.y-40,48*Math.max(0,m.hp)/m.maxHp,6,3,'#f7b4ae');
+   }
   }
  }
  if(s.gameId==='jumping'){
@@ -255,6 +285,8 @@ function fighters(t){
    g.beginPath();g.moveTo(36,0);g.lineTo(-22,-22);g.lineTo(-10,0);g.lineTo(-22,22);g.closePath();g.fill();g.stroke();
    g.fillStyle='#bbfaff';g.beginPath();g.ellipse(2,0,12,7,0,0,6.283);g.fill();
    g.shadowBlur=0;g.fillStyle='#ffbf79';g.beginPath();g.moveTo(-22,-9);g.lineTo(-34-Math.sin(t*18)*5,0);g.lineTo(-22,9);g.fill();
+  }else if(s.gameId==='tank'){
+   tankSprite(0,0,p.bodyA??p.a,p.a,col,'standard',t);
   }else{
    g.rotate(p.a);g.fillStyle='#142034';g.strokeStyle=col;g.lineWidth=3;
    rounded(-25,-23,48,46,8);g.fill();g.stroke();
