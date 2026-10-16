@@ -11,10 +11,35 @@
 .modeCard .modeLength{display:block;color:#79e9db;font-size:10px;font-weight:900;letter-spacing:.3px;margin-top:6px}.modeCard:disabled{cursor:default;opacity:.67}
 #gameTitle{font-weight:900;letter-spacing:.4px}.gameHint{color:#b3cbdf;font-size:12px;font-weight:750}
 @media(max-width:900px){.modeGrid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:460px){.modeCard{min-height:106px;padding:10px}.modeCard .modeName{font-size:13px}.modePanel{padding:13px}}
-.stage:fullscreen{width:100vw;height:100vh;border-radius:0;display:flex;flex-direction:column;background:#081727}.stage:fullscreen .canvasOuter{flex:1;min-height:0}.stage:fullscreen #arena{height:100%!important;max-height:none!important}.stage.tankTheater{position:fixed;inset:0;z-index:1000;display:flex;flex-direction:column;border-radius:0;background:#081727}.stage.tankTheater .canvasOuter{flex:1;min-height:0}.stage.tankTheater #arena{height:100%!important;max-height:none!important}</style></head><body><div class="page"><header class="top"><div><div class="eyebrow">EXPLORE & EARN PRESENTS</div><div class="brand">PARTY <b>ARENA</b></div></div><div class="status">FOUR WORLDS · ONLINE PARTY</div></header>
+.stage:fullscreen{width:100vw;height:100vh;border-radius:0;display:flex;flex-direction:column;background:#081727}.stage:fullscreen .canvasOuter{flex:1;min-height:0}.stage:fullscreen #arena{height:100%!important;max-height:none!important}.stage.tankTheater{position:fixed;inset:0;z-index:1000;display:flex;flex-direction:column;border-radius:0;background:#081727}.stage.tankTheater .canvasOuter{flex:1;min-height:0}.stage.tankTheater #arena{height:100%!important;max-height:none!important}
+.classicShell{position:fixed;inset:0;width:100%;height:100vh;height:100dvh;display:flex;flex-direction:column;background:#071323;z-index:1200}
+.classicTop{flex:0 0 auto;min-height:55px;display:flex;align-items:center;gap:10px;padding:8px 12px;background:#0c2038;border-bottom:1px solid #31546e}
+.classicBrand{font-weight:950;color:#76ffe0;white-space:nowrap;font-size:13px}
+.classicBadge{font-size:11px;background:#17394d;color:#d7f2f4;border:1px solid #3d6b7c;border-radius:8px;padding:7px 9px;white-space:nowrap}
+.classicFlex{flex:1;min-width:0}.classicButtons{display:flex;gap:6px}.classicButtons button{font-size:11px;white-space:nowrap;padding:8px 11px}
+.classicIframe{display:block;flex:1;width:100%;min-height:0;border:0;background:#081625}
+.classicBoard{font-size:11px;color:#bfd3e2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:250px}
+@media(max-width:850px){.classicTop{gap:5px;flex-wrap:wrap;padding:6px 8px}.classicBrand{font-size:11px}.classicBadge{font-size:10px;padding:5px 6px}.classicButtons button{font-size:10px;padding:6px}.classicBoard{order:4;flex-basis:100%;max-width:none;text-align:center}}
+</style></head><body><div class="page"><header class="top"><div><div class="eyebrow">EXPLORE & EARN PRESENTS</div><div class="brand">PARTY <b>ARENA</b></div></div><div class="status">FOUR WORLDS · ONLINE PARTY</div></header>
 <div id="welcome"><div class="hero"><div class="tag">MULTIPLAYER ARENA · PROFESSIONAL 2D EDITION</div><h1>FOUR WORLDS.<br><em>ONE PARTY.</em></h1><p>Challenge friends in Tank Survival, first-person Fishing 3D, Skybound Jumping and Space Evolution. Four different worlds, one private room.</p><div class="facts"><span class="fact"><b>2–8</b>PLAYERS</span><span class="fact"><b>2:30</b>PER MATCH</span><span class="fact"><b>LIVE</b>ACTION</span></div></div><div class="grid"><section class="panel"><h2>Enter the Arena</h2><p>Choose a callsign, create a room or join a friend.</p><label class="label">YOUR NAME</label><input id="name" maxlength="18" placeholder="Your callsign"><div class="actions"><button id="create" class="primary">✦ CREATE ROOM</button><button id="join" class="secondary">↗ JOIN ROOM</button></div><div class="error" id="startError"></div></section><aside class="panel"><h2>Have a room code?</h2><p>Enter the six-character code shared by your friend.</p><label class="label">ROOM CODE</label><input id="codeInput" maxlength="6" placeholder="A1B2C3" style="text-transform:uppercase"><div class="hint">No downloads required. Everyone opens this same website, then joins the same room.</div></aside></div></div>
 <div id="lobby" class="hidden"><div class="hero"><div class="tag">PRIVATE PARTY ROOM</div><div class="code" id="lobbyCode">------</div><p>Share this code with your friends. The host can launch a match after two players join.</p><span class="pill" id="lobbyCount">1 / 8 PLAYERS</span><span class="pill" id="lobbyMode">CHOOSE ONE OF 4 GAMES</span><span class="pill" id="lobbyDuration">150-SECOND MATCH</span><div class="actions"><button id="start" class="primary">▶ START MATCH</button><button id="practice" class="secondary">🧪 TEST SOLO</button><button id="copy" class="secondary">⧉ COPY INVITE</button><button id="leave" class="danger">← LEAVE ROOM</button></div><p class="muted" id="hostHint">Waiting for the host...</p></div><section class="modePanel"><h2 class="modeTitle">🎮 CHOOSE YOUR WORLD</h2><p class="modeDesc">Tank · Fishing 3D · Jumping · Space — host selects for everyone.</p><div class="modeGrid" id="modeCards"></div></section><div class="grid"><section class="panel"><h2>PLAYER LINEUP</h2><div class="roster" id="roster"></div></section><aside class="panel"><h2>HOW TO PLAY</h2><p><b>Tank:</b> WASD move, mouse aim, click fire.<br><b>Fishing:</b> first-person lake view, Space cast/reel.<br><b>Jumping:</b> A/D move, Space jump.<br><b>Space:</b> WASD fly, click fire.</p><p>On mobile, use the on-screen controls. Each world has its own objective.</p><div class="hint">The host picks a world. TEST SOLO lets you practice before friends arrive.</div></aside></div></div>
 <div id="game" class="hidden"><div class="layout"><div class="stage"><div class="stageTop"><b id="gameTitle">⚡ NEON RUMBLE</b><div class="statGroup"><span>⏱ <strong id="clock">2:30</strong></span><span>🏆 <strong id="score">0</strong> PTS</span><span id="phase">LIVE</span></div><button id="fullscreenTank" class="secondary" style="padding:8px 11px;font-size:11px">⛶ FULLSCREEN</button><button id="sound" class="secondary" style="padding:8px 11px;font-size:11px">♪ SOUND OFF</button></div><div class="canvasOuter"><canvas id="arena"></canvas><iframe id="fishingFrame" class="hidden" title="First-person Fishing 3D" allow="autoplay" style="position:absolute;inset:0;width:100%;height:100%;border:0;z-index:2;background:#071e2b"></iframe><canvas id="minimap"></canvas><div class="hud"><div id="hpLabel">HP 100 / 100</div><div class="health"><i id="hpBar"></i></div><div id="boost">DASH READY</div></div><div class="touch"><div class="pad" id="pad"></div><div class="touchBtns"><button class="touchDash" id="dash">DASH</button><button class="touchFire" id="fire">FIRE</button></div></div><div class="overlay" id="overlay"><div class="dialog"><div class="tag" id="resultTag">GET READY</div><h1 id="resultTitle">BATTLE STARTING</h1><p id="resultDesc">Prepare for combat.</p><div id="results" class="results"></div><div class="actions" id="overlayActions"></div></div></div></div><div class="stageBottom"><span id="controlHint">WASD MOVE · MOUSE AIM · HOLD CLICK FIRE · SHIFT DASH</span><span class="gameHint" id="gameHint">OUTPLAY YOUR RIVALS</span><div style="display:flex;gap:8px"><button class="secondary" id="mobileLobby" style="padding:7px 10px;font-size:11px">↩ LOBBY</button><button class="danger" id="exitGame" style="padding:7px 10px;font-size:11px">EXIT</button></div></div></div><aside class="panel"><h2>LIVE LEADERBOARD</h2><div id="leaderboard"></div><div class="hint">Take cover behind walls, recover health and use your dash to escape incoming fire.</div><div class="actions"><button id="backLobby" class="secondary">↩ BACK TO LOBBY</button></div></aside></div></div><div id="toast"></div></div>
+<div id="classicShell" class="classicShell hidden" aria-label="Original Explore & Earn HTML">
+ <div class="classicTop">
+  <span class="classicBrand">🎮 PARTY ARENA</span>
+  <span id="classicMode" class="classicBadge">TANK</span>
+  <span id="classicClock" class="classicBadge">2:30</span>
+  <span id="classicRoom" class="classicBadge">ROOM ------</span>
+  <span id="classicBoard" class="classicBoard">Scores...</span>
+  <span class="classicFlex"></span>
+  <div class="classicButtons">
+   <button id="classicMusic" class="secondary">♪ MUSIC OFF</button>
+   <button id="classicBack" class="secondary hidden">↩ LOBBY</button>
+   <button id="classicLeave" class="danger">EXIT</button>
+  </div>
+ </div>
+ <iframe id="classicFrame" class="classicIframe" title="Original HTML game" allow="autoplay; fullscreen"></iframe>
+</div>
 <script>
 (()=>{'use strict';
 const $=id=>document.getElementById(id),C=['#63f3e0','#ffb55b','#ae8bff','#ff6b9a','#78adff','#b3f278','#ffd677','#ff86ed'];
@@ -31,27 +56,37 @@ function connect(){if(source)source.close();source=new EventSource('/events?toke
 function mine(){return s?.players.find(p=>p.id===s.me)}
 function now(){return Date.now()-offset}
 function clock(ms){let n=Math.max(0,Math.ceil(ms/1000));return Math.floor(n/60)+':'+String(n%60).padStart(2,'0')}
-let boardHash='',overlayPhase='',fishingMounted=false;
-function syncFishing(){
- const active=s?.gameId==='fishing'&&s.phase==='playing';
- const frame=$('fishingFrame');
- frame.classList.toggle('hidden',!active);
- $('arena').style.visibility=active?'hidden':'visible';
- $('minimap').style.display=active?'none':'';
- document.querySelector('.hud').style.display=active?'none':'';
- document.querySelector('.touch').style.display=active?'none':'';
- if(active&&!fishingMounted){fishingMounted=true;frame.src='/fishing.html'}
- else if(!active&&fishingMounted){fishingMounted=false;frame.src='about:blank'}
+let boardHash='',overlayPhase='',classicLoadedPath='',lastClassicScoreSent=0;
+function syncClassic(){
+ const active=!!s&&s.phase==='playing'&&['tank','fishing','jumping','space'].includes(s.gameId);
+ $('classicShell').classList.toggle('hidden',!active);
+ if(!active){
+  if(classicLoadedPath){classicLoadedPath='';$('classicFrame').src='about:blank'}
+  return;
+ }
+ const url=s.gameId==='fishing'?'/fishing.html':'/classic.html?partyMode='+encodeURIComponent(s.gameId);
+ if(classicLoadedPath!==url){classicLoadedPath=url;$('classicFrame').src=url}
+ $('classicMode').textContent=(s.gameId==='tank'?'🛡️ ':s.gameId==='fishing'?'🎣 ':s.gameId==='jumping'?'☁️ ':'🚀 ')+(s.games.find(g=>g.id===s.gameId)?.name||s.gameId);
+ $('classicRoom').textContent='ROOM '+s.code;
+ $('classicBack').classList.toggle('hidden',!s.isHost);
+ $('classicBoard').textContent=[...s.players].sort((a,b)=>b.score-a.score).slice(0,4).map((p,i)=>(i+1)+'. '+p.name+' '+p.score).join(' · ');
 }
 window.addEventListener('message',async e=>{
- if(e.origin!==location.origin||e.source!==$('fishingFrame').contentWindow)return;
- if(e.data?.type==='party-fish-caught'&&s?.gameId==='fishing'&&s.phase==='playing'&&!s.isSpectator){
-  try{let result=await api('fish',{token});alertText('🎣 +'+result.points+' points!')}
-  catch(err){alertText(err.message)}
+ if(e.origin!==location.origin||e.source!==$('classicFrame').contentWindow||!s||s.phase!=='playing'||s.isSpectator)return;
+ if(e.data?.type==='party-fish-caught'&&s.gameId==='fishing'){
+  try{let r=await api('fish',{token});alertText('🎣 +'+r.points+' points!')}catch(err){alertText(err.message)}
+ }
+ if(e.data?.type==='party-original-score'&&e.data.gameId===s.gameId&&s.gameId!=='fishing'){
+  if(!Number.isFinite(Number(e.data.points)))return;
+  let t=Date.now();if(!e.data.complete&&t-lastClassicScoreSent<750)return;lastClassicScoreSent=t;
+  try{await api('classic-score',{token,points:Number(e.data.points)})}catch(err){}
  }
 });
-
-function sync(){if(!s)return;syncFishing();if(s.phase==='lobby'){if(view!=='lobby')display('lobby');drawLobby();boardHash='';overlayPhase='';return}if(view!=='game')display('game');const hash=s.players.map(p=>p.id+':'+p.score+':'+p.kills+':'+p.deaths+':'+p.online).join('|')+':'+s.isHost;if(hash!==boardHash){drawBoard();boardHash=hash}if(s.phase!==overlayPhase){drawOverlay();overlayPhase=s.phase}drawHud();if(s.phase==='playing')for(const f of s.fx){if(fxSeen.has(f.id))continue;fxSeen.add(f.id);if(fxSeen.size>500)fxSeen=new Set([f.id]);makeDust(f);if(soundOn&&['ko','hit'].includes(f.type))soundEffect(f.type)}}
+$('classicBack').onclick=back;
+$('classicLeave').onclick=leave;
+$('classicMusic').onclick=()=>{soundOn=!soundOn;$('classicMusic').textContent=soundOn?'♫ MUSIC ON':'♪ MUSIC OFF';if(soundOn)soundEffect('hit')};
+setInterval(()=>{if(s?.phase==='playing')$('classicClock').textContent=clock(s.endsAt-now())},240);
+function sync(){if(!s){syncClassic();return}syncClassic();if(s.phase==='lobby'){if(view!=='lobby')display('lobby');drawLobby();boardHash='';overlayPhase='';return}if(view!=='game')display('game');const hash=s.players.map(p=>p.id+':'+p.score+':'+p.kills+':'+p.deaths+':'+p.online).join('|')+':'+s.isHost;if(hash!==boardHash){drawBoard();boardHash=hash}if(s.phase!==overlayPhase){drawOverlay();overlayPhase=s.phase}drawHud();if(s.phase==='playing')for(const f of s.fx){if(fxSeen.has(f.id))continue;fxSeen.add(f.id);if(fxSeen.size>500)fxSeen=new Set([f.id]);makeDust(f);if(soundOn&&['ko','hit'].includes(f.type))soundEffect(f.type)}}
 const GAME_ICONS={tank:'🛡️',fishing:'🎣',jumping:'☁️',space:'🚀'};
 const GAME_HINTS={tank:'SHELLS RICOCHET · DESTRUCTIBLE COVER · 5 WAVES',fishing:'CAST · WAIT FOR A BITE · REEL CAREFULLY',jumping:'A/D MOVE · SPACE JUMP · COLLECT STARS',space:'WASD FLY · MOUSE AIM · SHOOT ASTEROIDS'};
 function gameInfo(){return s?.games?.find(g=>g.id===s.gameId)||{id:'tank',name:'Tank Survival',duration:150000,objective:'Drive your tank and survive.'}}
@@ -344,7 +379,7 @@ function projectiles(){
 }
 function effects(dt){for(const p of dust){p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt;g.globalAlpha=Math.max(0,p.life/.65);g.fillStyle=p.color;g.beginPath();g.arc(p.x,p.y,3,0,6.283);g.fill()}g.globalAlpha=1;dust=dust.filter(p=>p.life>0)}
 function drawMap(){mg.setTransform(1,0,0,1,0,0);mg.fillStyle='#051426';mg.fillRect(0,0,284,184);mg.save();mg.scale(284/s.arena.w,184/s.arena.h);mg.fillStyle='#34566c';for(const o of s.arena.obstacles)mg.fillRect(o.x,o.y,o.w,o.h);for(const p of s.players){mg.fillStyle=C[p.slot];mg.beginPath();mg.arc(p.x,p.y,p.id===s.me?31:20,0,6.283);mg.fill()}mg.strokeStyle='#91ffe6';mg.lineWidth=8;mg.strokeRect(camera.x,camera.y,screen.w/camera.z,screen.h/camera.z);mg.restore()}
-function frame(ts){requestAnimationFrame(frame);if(view!=='game'||!s||s.gameId==='fishing')return;if(!screen.w||Math.abs(c.width-c.clientWidth*screen.dpr)>3)resize();const w=screen.w,h=screen.h;if(!w||!h)return;g.setTransform(screen.dpr,0,0,screen.dpr,0,0);g.clearRect(0,0,w,h);let focus=mine()||s.players[0]||{x:900,y:540},m=smooth.get(focus.id)||focus,z=Math.min(1.05,Math.max(.44,Math.min(w/1150,h/720)));camera.z=z;camera.x=Math.max(0,Math.min(s.arena.w-w/z,m.x-w/(2*z)));camera.y=Math.max(0,Math.min(s.arena.h-h/z,m.y-h/(2*z)));g.save();g.scale(z,z);g.translate(-camera.x,-camera.y);scenery(ts/1000);modeDecor(ts/1000);pickups(ts/1000);projectiles();fighters(ts/1000);effects(Math.min(.04,(ts-(lastFrame||ts))/1000));g.restore();drawMap();lastFrame=ts;if(s.phase==='playing'||s.phase==='countdown'){drawHud();if(s.phase==='countdown')$('resultTitle').textContent='BATTLE IN '+Math.max(1,Math.ceil((s.endsAt-now())/1000))}}
+function frame(ts){requestAnimationFrame(frame);if(view!=='game'||!s||s.phase==='playing')return;if(!screen.w||Math.abs(c.width-c.clientWidth*screen.dpr)>3)resize();const w=screen.w,h=screen.h;if(!w||!h)return;g.setTransform(screen.dpr,0,0,screen.dpr,0,0);g.clearRect(0,0,w,h);let focus=mine()||s.players[0]||{x:900,y:540},m=smooth.get(focus.id)||focus,z=Math.min(1.05,Math.max(.44,Math.min(w/1150,h/720)));camera.z=z;camera.x=Math.max(0,Math.min(s.arena.w-w/z,m.x-w/(2*z)));camera.y=Math.max(0,Math.min(s.arena.h-h/z,m.y-h/(2*z)));g.save();g.scale(z,z);g.translate(-camera.x,-camera.y);scenery(ts/1000);modeDecor(ts/1000);pickups(ts/1000);projectiles();fighters(ts/1000);effects(Math.min(.04,(ts-(lastFrame||ts))/1000));g.restore();drawMap();lastFrame=ts;if(s.phase==='playing'||s.phase==='countdown'){drawHud();if(s.phase==='countdown')$('resultTitle').textContent='BATTLE IN '+Math.max(1,Math.ceil((s.endsAt-now())/1000))}}
 requestAnimationFrame(frame);if(token)api('resume',{token}).then(connect).catch(closeSession);else display('welcome');
 })();
 </script></body></html>
