@@ -242,7 +242,12 @@ function updateRoom(r,t,dt){
  if(t>=r.endsAt){endGame(r);return}
  // Source-faithful HTML engines run inside each player's browser.
  // The server controls the common match clock and leaderboard.
- if(r.gameId==='tank'){tankWorld.tick(r,t,dt);return}
+ if(r.gameId==='tank'){
+  // Preserve the match clock but stop costly NPC/physics work while nobody
+  // is connected to this room. Simulation resumes on reconnect.
+  if(r.clients.size)tankWorld.tick(r,t,dt);
+  return;
+ }
  if(['fishing','jumping','space'].includes(r.gameId))return;
  if(r.gameId==='jumping'){tickJumping(r,t,dt);return}
  for(const p of r.players){
