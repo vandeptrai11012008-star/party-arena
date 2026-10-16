@@ -4,7 +4,7 @@ Party Arena offers **four games with their original HTML interfaces**, one lobby
 
 ## Original sources preserved
 
-- **Tank Survival:** uses the Tank Survival engine and visual layout directly from the user-provided `Explore_and_Earn_Space_Evolution_Fixed_v21(2).html`.
+- **Tank Survival:** uses the original Tank Survival engine and visual layout from `Explore_and_Earn_Space_Evolution_Fixed_v21(2).html`. Standard and Heavy **red enemy tanks take 3 direct cannon hits** (orange Scout tanks take 1). Wooden crates and barrels take 2 hits, sandbags take 3; when destroyed, these covers regenerate **12 seconds later** if the spawn area is clear. New destructible crates/barrels appear about every **16 seconds** (capped at 9 added covers per match). Concrete and steel remain permanent.
 - **Skybound Trials (Jumping):** uses the original v21 platforms, controls, progression and visual scene.
 - **Nebula Endless (Space):** uses the original v21 space world, HUD, bosses and exploration.
 - **Fishing 3D:** uses the original first-person WebGL fishing HTML prototype supplied in this project, shown as a separate full-page game.
