@@ -253,10 +253,10 @@ function tick(r,t,dt){
  updateEnemies(w,r.players,t,dt);
  updateWorldObjects(w,r.players,t,dt);
 }
-function view(r){
+function view(r,includeObstacles=true){
  const w=r.tank;if(!w)return null;
  return {w:W,h:H,wave:w.wave,layoutVersion:w.layoutVersion,
-   obstacles:w.obstacles.filter(o=>o.active).map(o=>({id:o.id,x:o.x,y:o.y,w:o.w,h:o.h,type:o.type,hp:o.hp,maxHp:o.maxHp})),
+   obstacles:includeObstacles?w.obstacles.filter(o=>o.active).map(o=>({id:o.id,x:o.x,y:o.y,w:o.w,h:o.h,type:o.type,hp:o.hp,maxHp:o.maxHp})):null,
    bullets:w.bullets.map(b=>({x:Math.round(b.x),y:Math.round(b.y),vx:Math.round(b.vx),vy:Math.round(b.vy),owner:b.owner})),
    enemyBullets:w.enemyBullets.map(b=>({x:Math.round(b.x),y:Math.round(b.y),vx:Math.round(b.vx),vy:Math.round(b.vy)})),
    mobs:w.mobs.map(m=>({id:m.id,x:Math.round(m.x),y:Math.round(m.y),a:m.angle,hp:m.hp,maxHp:m.maxHp,kind:m.kind})),
