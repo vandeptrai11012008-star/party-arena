@@ -56,17 +56,19 @@ function connect(){if(source)source.close();source=new EventSource('/events?toke
 function mine(){return s?.players.find(p=>p.id===s.me)}
 function now(){return Date.now()-offset}
 function clock(ms){let n=Math.max(0,Math.ceil(ms/1000));return Math.floor(n/60)+':'+String(n%60).padStart(2,'0')}
-let boardHash='',overlayPhase='',classicLoadedPath='',lastClassicScoreSent=0,tankInputBusy=false;
+let boardHash='',overlayPhase='',classicLoadedPath='',lastClassicScoreSent=0,tankInputBusy=false,tankMapCache=null,tankInputQueue=null;
 function syncClassic(){
  const active=!!s&&s.phase==='playing'&&['tank','fishing','jumping','space'].includes(s.gameId);
  $('classicShell').classList.toggle('hidden',!active);
  if(!active){
   if(classicLoadedPath){classicLoadedPath='';$('classicFrame').src='about:blank'}
+  tankMapCache=null;tankInputQueue=null;
   return;
  }
  const url=s.gameId==='fishing'?'/fishing.html':s.gameId==='tank'?'/tank-shared.html':'/classic.html?partyMode='+encodeURIComponent(s.gameId);
  if(classicLoadedPath!==url){classicLoadedPath=url;$('classicFrame').src=url}
  if(s.gameId==='tank'&&s.tank){
+  if(Array.isArray(s.tank.obstacles))tankMapCache=s.tank.obstacles;
   try{$('classicFrame').contentWindow?.postMessage({type:'party-tank-state',state:s},location.origin)}catch(e){}
  }
  $('classicMode').textContent=(s.gameId==='tank'?'🛡️ ':s.gameId==='fishing'?'🎣 ':s.gameId==='jumping'?'☁️ ':'🚀 ')+(s.games.find(g=>g.id===s.gameId)?.name||s.gameId);
@@ -77,14 +79,16 @@ function syncClassic(){
 window.addEventListener('message',async e=>{
  if(e.origin!==location.origin||e.source!==$('classicFrame').contentWindow||!s||s.phase!=='playing')return;
  if(e.data?.type==='party-tank-ready'&&s.gameId==='tank'){
-  if(s.tank)$('classicFrame').contentWindow?.postMessage({type:'party-tank-state',state:s},location.origin);
+  if(s.tank){
+   const snapshot=s.tank.obstacles===null&&tankMapCache?{...s,tank:{...s.tank,obstacles:tankMapCache}}:s;
+   $('classicFrame').contentWindow?.postMessage({type:'party-tank-state',state:snapshot},location.origin);
+  }
   return;
  }
  if(e.data?.type==='party-tank-input'&&s.gameId==='tank'&&!s.isSpectator){
-  if(tankInputBusy)return;
-  tankInputBusy=true;
-  try{await api('input',{token,input:e.data.input||{}})}catch(err){}
-  finally{tankInputBusy=false}
+  // Coalesce input during slow requests; never queue old movement frames.
+  tankInputQueue=e.data.input||{};
+  flushTankInput();
   return;
  }
  if(s.isSpectator)return;
@@ -97,6 +101,16 @@ window.addEventListener('message',async e=>{
   try{await api('classic-score',{token,points:Number(e.data.points)})}catch(err){}
  }
 });
+async function flushTankInput(){
+ if(tankInputBusy||!tankInputQueue||s?.gameId!=='tank'||s.phase!=='playing')return;
+ const input=tankInputQueue;tankInputQueue=null;
+ tankInputBusy=true;
+ try{await api('input',{token,input})}catch(err){}
+ finally{
+  tankInputBusy=false;
+  if(tankInputQueue)flushTankInput();
+ }
+}
 $('classicBack').onclick=back;
 $('classicLeave').onclick=leave;
 $('classicMusic').onclick=()=>{soundOn=!soundOn;$('classicMusic').textContent=soundOn?'♫ MUSIC ON':'♪ MUSIC OFF';if(soundOn)soundEffect('hit')};
